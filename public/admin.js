@@ -1,4 +1,4 @@
-// หลังบ้าน — สิทธิ์จริงอยู่ที่ RLS และฟังก์ชันในฐานข้อมูล หน้านี้แค่ซ่อนเมนูที่ไม่เกี่ยวข้อง
+// หน้าจัดการ — สิทธิ์จริงอยู่ที่ RLS และฟังก์ชันในฐานข้อมูล หน้านี้แค่ซ่อนเมนูที่ไม่เกี่ยวข้อง
 const $ = (id) => document.getElementById(id);
 const sb = window.supabase.createClient(window.TR_CONFIG.url, window.TR_CONFIG.key);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -239,7 +239,7 @@ function groupDrivers(list) {
 
 // Card เป็นรูป PNG วาดเองบน canvas (ไม่ส่งข้อมูลออกนอกเครื่อง)
 function downloadCard(p) {
-  const font = '"Noto Sans Thai","Sukhumvit Set","Thonburi",sans-serif', W = 900;
+  const font = '"Inter","Noto Sans Thai",sans-serif', W = 900;
   const c = document.createElement('canvas'), x = c.getContext('2d');
   const lines = [['จำนวนเรื่อง', String(p.items.length)], ['รหัสคนขับ', p.codes.join(', ') || '-'], ['เลขบัตร', p.last4 ? '*********' + p.last4 : '-'], ['ทะเบียน', p.plates.join(', ')], ['อู่', p.garages.map(gName).join(', ')]];
   const recent = p.items.slice(0, 5);
