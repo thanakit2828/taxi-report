@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 if (new URLSearchParams(location.search).has('embed')) document.body.classList.add('embed');   // แสดงเต็มกว้างในหน้าจัดการ
 const MAX_FILES = 5, MAX_BYTES = 10 * 1024 * 1024, MAX_IMAGE_PX = 1600;
 const cfg = window.TR_CONFIG || {};
-const sb = cfg.url && cfg.key && window.supabase ? window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: false } }) : null;
+const sb = cfg.url && cfg.key && window.supabase ? window.supabase.createClient(cfg.url, cfg.key) : null;
 
 function notice(msg) {
   $('notice').textContent = msg || '';
@@ -42,7 +42,8 @@ function validate() {
   if (!$('incidentDate').value) return 'กรุณาเลือกวันเกิดเหตุ';
   if ($('incidentDate').value > today()) return 'วันเกิดเหตุต้องไม่เกินวันนี้';
   const nid = $('nid').value.replace(/\D/g, '');
-  if (nid && !validThaiId(nid)) return 'เลขบัตรประชาชนไม่ถูกต้อง';
+  if (!nid) return 'กรุณากรอกเลขบัตรประชาชนคนขับ';
+  if (!validThaiId(nid)) return 'เลขบัตรประชาชนไม่ถูกต้อง';
   const drvPhone = $('driverPhone').value.replace(/\D/g, '');
   if (drvPhone && !/^0\d{8,9}$/.test(drvPhone)) return 'เบอร์มือถือคนขับไม่ถูกต้อง';
   if ($('detail').value.trim().length < 10) return 'กรุณาเล่ารายละเอียดอย่างน้อย 10 ตัวอักษร';
@@ -85,13 +86,24 @@ async function uploadFiles() {
   return out;
 }
 
+// ต้อง login ก่อน · บัญชีอู่ล็อกอู่ตัวเอง · ผู้ดูแลเลือกอู่ได้ (ฐานข้อมูลบังคับซ้ำอีกชั้น)
+let myGarage = null;
 async function loadGarages() {
   const sel = $('garage');
   if (!sb) { sel.innerHTML = '<option value="">ยังไม่พร้อมใช้งาน</option>'; notice('ระบบยังไม่พร้อมใช้งาน'); return; }
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $('form').hidden = true; $('needLogin').hidden = false; return; }
+  const { data: member } = await sb.from('garage_members').select('role,garage_id').eq('user_id', session.user.id).maybeSingle();
   const { data, error } = await sb.from('garages').select('id,name').eq('is_active', true).order('sort_order').order('name');
-  if (error) { sel.innerHTML = '<option value="">โหลดไม่สำเร็จ</option>'; notice('โหลดรายชื่ออู่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); return; }
+  if (error || !member) { sel.innerHTML = '<option value="">โหลดไม่สำเร็จ</option>'; notice('โหลดข้อมูลอู่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); return; }
+  if (member.role !== 'admin') {
+    const own = data.find((g) => g.id === member.garage_id);
+    if (!own) { sel.innerHTML = '<option value="">อู่นี้ปิดรับเรื่อง</option>'; sel.disabled = true; notice('อู่ของบัญชีนี้ปิดรับเรื่องอยู่ กรุณาติดต่อผู้ดูแล'); $('submit').disabled = true; return; }
+    myGarage = own.id; sel.replaceChildren(new Option(own.name, own.id)); sel.value = own.id; sel.disabled = true;
+    return;
+  }
   sel.innerHTML = '<option value="">เลือกอู่</option>';
-  for (const g of data) { const o = new Option(g.name, g.id); sel.add(o); }
+  for (const g of data) sel.add(new Option(g.name, g.id));
 }
 
 $('form').addEventListener('submit', async (e) => {
@@ -104,7 +116,7 @@ $('form').addEventListener('submit', async (e) => {
   btn.disabled = true; btn.textContent = 'กำลังส่ง…';
   try {
     const files = await uploadFiles();
-    const { data, error } = await sb.rpc('submit_complaint', {
+    const { data, error } = await sb.rpc('submit_garage_complaint', {
       p_garage_id: $('garage').value,
       p_incident_date: $('incidentDate').value,
       p_driver_name: $('driverName').value,
@@ -114,7 +126,6 @@ $('form').addEventListener('submit', async (e) => {
       p_driver_line_id: $('driverLine').value,
       p_detail: $('detail').value,
       p_files: files,
-      p_website: $('website').value,
     });
     if (error) throw new Error(error.code === 'P0001' ? error.message : 'ส่งเรื่องไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     const { data: refNo } = await sb.rpc('complaint_ref', { p_id: data });
@@ -130,6 +141,7 @@ $('form').addEventListener('submit', async (e) => {
 
 $('again').addEventListener('click', () => {
   $('form').reset(); picked = []; renderFiles();
+  if (myGarage) $('garage').value = myGarage;
   $('done').hidden = true; $('form').hidden = false;
 });
 
