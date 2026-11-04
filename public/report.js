@@ -49,9 +49,6 @@ function validate() {
   if (picked.length > MAX_FILES) return `แนบไฟล์ได้ไม่เกิน ${MAX_FILES} ไฟล์`;
   if (picked.some((f) => !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(f.type))) return 'รองรับเฉพาะรูปและไฟล์ PDF';
   if (picked.some((f) => f.type === 'application/pdf' && f.size > MAX_BYTES)) return 'ไฟล์ PDF ต้องไม่เกิน 10 MB';
-  if ($('reporterName').value.trim().length < 2) return 'กรุณากรอกชื่อผู้แจ้ง';
-  if (!/^0\d{8,9}$/.test($('phone').value.replace(/\D/g, ''))) return 'เบอร์โทรผู้แจ้งไม่ถูกต้อง';
-  if (!$('consent').checked) return 'กรุณายอมรับเงื่อนไขการเก็บข้อมูล';
   return '';
 }
 
@@ -116,9 +113,6 @@ $('form').addEventListener('submit', async (e) => {
       p_driver_phone: $('driverPhone').value,
       p_driver_line_id: $('driverLine').value,
       p_detail: $('detail').value,
-      p_reporter_name: $('reporterName').value,
-      p_contact_phone: $('phone').value,
-      p_consent: $('consent').checked,
       p_files: files,
       p_website: $('website').value,
     });
