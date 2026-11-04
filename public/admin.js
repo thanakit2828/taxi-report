@@ -4,8 +4,7 @@ const sb = window.supabase.createClient(window.TR_CONFIG.url, window.TR_CONFIG.k
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (d) => (d ? new Date(d).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' }) : '-');
 const STATUS = { new: 'ใหม่', in_progress: 'กำลังดำเนินการ', closed: 'ปิดเรื่อง' };
-const REPORTER = { passenger: 'ผู้โดยสาร', garage_staff: 'พนักงานอู่' };
-const AUDIT = { reveal_national_id: 'เปิดดูเลขบัตร', move_complaint: 'ย้ายอู่', set_status: 'เปลี่ยนสถานะ', edit_complaint: 'แก้ไขเรื่อง', delete_complaint: 'ลบเรื่อง', create_user: 'สร้างผู้ใช้', set_password: 'ตั้งรหัสผ่าน', enable_user: 'เปิดบัญชี', disable_user: 'ปิดบัญชี' };
+const AUDIT = { reveal_national_id: 'เปิดดูเลขบัตร', move_complaint: 'ย้ายอู่', set_status: 'เปลี่ยนสถานะ', edit_complaint: 'แก้ไขเรื่อง', set_note: 'บันทึกหมายเหตุ', delete_complaint: 'ลบเรื่อง', create_user: 'สร้างผู้ใช้', set_password: 'ตั้งรหัสผ่าน', enable_user: 'เปิดบัญชี', disable_user: 'ปิดบัญชี' };
 const REPORT_URL = location.origin + '/report';
 // ตรงกับ private.login_email ในฐานข้อมูล: ชื่อรูปแบบเดิมใช้ตรงๆ ชื่ออื่น (ไทย/เว้นวรรค) ใช้ hash
 async function toEmail(u) {
@@ -15,7 +14,7 @@ async function toEmail(u) {
   return 'u-' + [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32) + '@taxi-report.local';
 }
 
-const S = { me: null, isAdmin: false, tab: 'home', garages: [], complaints: [], users: [], filter: { garage: '', status: '', q: '', from: '', to: '', sort: 'desc' }, dash: null, redraw: null, viewing: null };
+const S = { me: null, isAdmin: false, tab: 'home', garages: [], complaints: [], users: [], filter: { garage: '', q: '', from: '', to: '', sort: 'desc' }, dash: null, redraw: null, viewing: null };
 
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.hidden = false;
@@ -39,11 +38,10 @@ function presetRange(p) {
 // ใช้กรองร่วมกันทั้งหน้าภาพรวมและหน้าเรื่องร้องเรียน
 function matchBase(c, f) {
   if (f.garage && c.garage_id !== f.garage) return false;
-  if (f.status && c.status !== f.status) return false;
   if (!f.q) return true;
-  const text = [c.ref_no, c.reporter_name, c.reporter_last_name, c.driver_code, c.contact_phone, c.plate].join(' ').toLowerCase();
+  const text = [c.ref_no, c.reporter_name, c.reporter_last_name, c.driver_code, c.contact_phone, c.driver_name, c.driver_phone, c.driver_line_id, c.plate].join(' ').toLowerCase();
   const digits = /^[\d\s-]+$/.test(f.q) ? f.q.replace(/\D/g, '') : '';
-  return text.includes(f.q) || (digits && (c.contact_phone || '').includes(digits));
+  return text.includes(f.q) || (digits && [c.contact_phone, c.driver_phone].some((v) => (v || '').includes(digits)));
 }
 const inRange = (c, from, to) => { const d = bkk(c.created_at); return (!from || d >= from) && (!to || d <= to); };
 const svg = (d) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -53,10 +51,9 @@ const ICON = {
   del: svg('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>'),
 };
 const canEdit = (c) => S.isAdmin || c.garage_id === S.me.garage_id;   // ฐานข้อมูลบังคับสิทธิ์ซ้ำอีกชั้น
-const filterControls = (f, withStatus = true) => `<select id="fGarage" aria-label="อู่"><option value="">ทุกอู่</option>${S.garages.map((g) => `<option value="${g.id}" ${f.garage === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>
-  ${withStatus ? `<select id="fStatus" aria-label="สถานะ"><option value="">ทุกสถานะ</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ''}
+const filterControls = (f) => `<select id="fGarage" aria-label="อู่"><option value="">ทุกอู่</option>${S.garages.map((g) => `<option value="${g.id}" ${f.garage === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>
   <input id="fQ" placeholder="ค้นหา ID เลขอ้างอิง ชื่อ นามสกุล เบอร์โทร" value="${esc(f.q)}" aria-label="ค้นหา">`;
-const readControls = (f) => { f.garage = $('fGarage').value; f.status = $('fStatus')?.value || ''; f.q = $('fQ').value.trim().toLowerCase(); };
+const readControls = (f) => { f.garage = $('fGarage').value; f.q = $('fQ').value.trim().toLowerCase(); };
 function complaintTable(list) {
   return `<p class="muted">${list.length} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ</th><th>นามสกุล</th><th>เบอร์โทร</th><th>ID</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
     ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc(c.reporter_name)}</td><td>${esc(c.reporter_last_name || '-')}</td><td>${esc(c.contact_phone)}</td><td>${esc(c.driver_code || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${S.isAdmin ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="10" class="muted">ไม่พบเรื่อง</td></tr>'}
@@ -166,7 +163,7 @@ async function go(tab) {
 const VIEWS = {
   // ── ภาพรวม: เปิดมาเป็นเดือนปัจจุบันเสมอ ──
   home() {
-    const f = S.dash = { preset: 'month', garage: '', status: '', q: '' };
+    const f = S.dash = { preset: 'month', garage: '', q: '' };
     [f.from, f.to] = presetRange('month');
     const PRE = [['all', 'เรื่องที่แจ้งทั้งหมด'], ['y12', 'ย้อนหลัง 12 เดือน'], ['last', 'เดือนที่แล้ว'], ['month', 'เดือนปัจจุบัน']];
     $('view').innerHTML = `<h2>ภาพรวม</h2>
@@ -178,8 +175,7 @@ const VIEWS = {
       <p class="muted" id="dPeriod"></p>
       <div class="charts">
         <section class="panel wide"><h3>จำนวนเรื่องตามเดือน <span class="muted">12 เดือนล่าสุด</span></h3><div id="cMonth"></div></section>
-        <section class="panel"><h3>ตามเคส <span class="muted">สถานะในช่วงที่เลือก</span></h3><div id="cStatus"></div></section>
-        <section class="panel"><h3>ตามอู่ <span class="muted">ในช่วงที่เลือก</span></h3><div id="cGarage"></div></section>
+        <section class="panel wide"><h3>ตามอู่ <span class="muted">ในช่วงที่เลือก</span></h3><div id="cGarage"></div></section>
       </div>
       <h3>เรื่องในช่วงที่เลือก</h3><div id="cList"></div>`;
     const redraw = () => {
@@ -193,7 +189,6 @@ const VIEWS = {
       const ym = bkk().slice(0, 7);
       const months = Array.from({ length: 12 }, (_, i) => addMonths(ym, i - 11)).map((m) => ({ ym: m, n: base.filter((c) => bkk(c.created_at).slice(0, 7) === m).length }));
       monthChart($('cMonth'), months, f.from || '0000-00', f.to || '9999-99');
-      $('cStatus').innerHTML = hBars(Object.entries(STATUS).map(([k, v]) => ({ label: v, n: list.filter((c) => c.status === k).length })));
       $('cGarage').innerHTML = hBars(S.garages.map((g) => ({ label: g.name, n: list.filter((c) => c.garage_id === g.id).length })).filter((r) => r.n || !f.garage).sort((a, b) => b.n - a.n));
       $('cList').innerHTML = complaintTable(list);
     };
@@ -204,7 +199,7 @@ const VIEWS = {
     };
     const custom = () => { f.preset = 'custom'; f.from = $('fFrom').value; f.to = $('fTo').value; redraw(); };
     $('fFrom').onchange = custom; $('fTo').onchange = custom;
-    $('fGarage').onchange = redraw; $('fStatus').onchange = redraw; $('fQ').oninput = redraw;
+    $('fGarage').onchange = redraw; $('fQ').oninput = redraw;
     redraw();
   },
 
@@ -212,7 +207,7 @@ const VIEWS = {
   complaints() {
     const f = S.filter;
     $('view').innerHTML = `<h2>เรื่องร้องเรียน</h2>
-      <div class="filters">${filterControls(f, false)}
+      <div class="filters">${filterControls(f)}
         <label class="inline">รีพอร์ตตั้งแต่ <input id="fFrom" type="date" value="${esc(f.from)}"></label>
         <label class="inline">ถึง <input id="fTo" type="date" value="${esc(f.to)}"></label>
         <select id="fSort" aria-label="เรียงตามวันเวลาที่รีพอร์ต"><option value="desc" ${f.sort === 'desc' ? 'selected' : ''}>ล่าสุดก่อน</option><option value="asc" ${f.sort === 'asc' ? 'selected' : ''}>เก่าสุดก่อน</option></select>
@@ -314,16 +309,17 @@ async function openComplaint(id) {
   const mine = S.isAdmin || c.garage_id === S.me.garage_id;   // เรื่องของอู่อื่น = ดูอย่างเดียว (ฐานข้อมูลก็บังคับเช่นกัน)
   $('dlgBody').innerHTML = `<h2>เรื่อง ${esc(c.ref_no)}</h2>
     <dl class="detail">
-      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', esc(gName(c.garage_id)))}${row('ทะเบียน', esc(c.plate))}
-      ${row('ผู้แจ้ง', `${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))} (${REPORTER[c.reporter_type]})`)}${row('เบอร์โทร', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`)}
-      ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('รหัสคนขับ', esc(c.driver_code || '-'))}
+      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', esc(gName(c.garage_id)))}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
+      ${row('ผู้แจ้ง', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ')))}${row('เบอร์โทรผู้แจ้ง', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`)}
+      ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('รหัสคนขับ', esc(c.driver_code || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
       ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">*********${esc(c.national_id_last4)}</span>${mine ? ' <button type="button" class="ghost small" id="revealBtn">แสดงเลขเต็ม</button>' : ''}` : '-')}
     </dl>
     <h3>รายละเอียด</h3><p class="prewrap">${esc(c.detail)}</p>
     <h3>ไฟล์แนบ</h3>${links.length ? `<ul>${links.join('')}</ul>` : '<p class="muted">ไม่มีไฟล์แนบ</p>'}
     <p>สถานะ <span class="tag ${c.status}">${STATUS[c.status]}</span>${mine ? '' : ' <span class="muted">เรื่องของอู่อื่น ดูได้อย่างเดียว</span>'}</p>
-    ${S.isAdmin ? `<div class="row move"><label>ย้ายไปอู่ <select id="dGarage">${S.garages.filter((g) => g.id !== c.garage_id).map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select></label>
-      <label>เหตุผล <input id="dReason" maxlength="200"></label><button type="button" id="dMove" class="ghost">ย้ายอู่</button></div>` : ''}
+    <h3>หมายเหตุของอู่</h3>
+    ${mine ? `<label class="sr" for="dNote">หมายเหตุหรือเหตุผลเพิ่มเติม</label><textarea id="dNote" rows="3" maxlength="2000" placeholder="ใส่หมายเหตุหรือเหตุผลเพิ่มเติม"></textarea><div class="row note-save"><button type="button" id="dNoteSave" class="ghost">บันทึกหมายเหตุ</button></div>`
+      : `<p class="prewrap">${esc(c.garage_note || '-')}</p>`}
     <div class="row end"><button type="button" id="dClose" class="ghost">ปิด</button></div>`;
   $('dlg').showModal();
   $('dClose').onclick = () => $('dlg').close();
@@ -333,29 +329,32 @@ async function openComplaint(id) {
     if (error) return toast(errMsg(error));
     $('nidVal').textContent = data || '-'; $('revealBtn').remove();
   };
-  if ($('dMove')) $('dMove').onclick = async () => {
-    const { error } = await sb.rpc('move_complaint', { p_complaint_id: id, p_garage_id: $('dGarage').value, p_reason: $('dReason').value });
-    if (error) return toast(errMsg(error));
-    toast('ย้ายอู่แล้ว'); $('dlg').close(); go(S.tab);
-  };
+  if ($('dNote')) {
+    $('dNote').value = c.garage_note || '';
+    $('dNoteSave').onclick = async () => {
+      const { error } = await sb.rpc('set_complaint_note', { p_complaint_id: id, p_note: $('dNote').value });
+      if (error) return toast(errMsg(error));
+      c.garage_note = $('dNote').value.trim() || null; toast('บันทึกหมายเหตุแล้ว');
+    };
+  }
 }
 
 function openComplaintEdit(c) {
   $('dlgBody').innerHTML = `<h2>แก้ไขเรื่อง ${esc(c.ref_no)}</h2><form id="dForm">
-    <div class="grid"><label>ชื่อผู้แจ้งหรือชื่ออู่ <input id="eName" required maxlength="100"></label><label>นามสกุล <input id="eLast" maxlength="100"></label>
-    <label>เบอร์โทร <input id="ePhone" required inputmode="tel" maxlength="15"></label><label>ID (รหัสคนขับ) <input id="eCode" maxlength="30"></label>
-    <label>ทะเบียนรถ <input id="ePlate" required maxlength="20"></label><label>วันเกิดเหตุ <input id="eDate" type="date" max="${bkk()}"></label>
-    <label>สถานะ <select id="eStatus">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
+    <div class="grid"><label>ชื่อผู้แจ้ง <input id="eName" required maxlength="100"></label><label>เบอร์โทรผู้แจ้ง <input id="ePhone" required inputmode="tel" maxlength="15"></label>
+    <label>วันเกิดเหตุ <input id="eDate" type="date" max="${bkk()}"></label><label>ชื่อคนขับ <input id="eDrv" maxlength="100"></label>
+    <label>ID (รหัสคนขับ) <input id="eCode" maxlength="30"></label><label>มือถือคนขับ <input id="eDrvPhone" inputmode="tel" maxlength="15"></label>
+    <label>Line ID <input id="eLine" maxlength="50" autocapitalize="none"></label><label>สถานะ <select id="eStatus">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
     <label>รายละเอียด <textarea id="eDetail" rows="5" required maxlength="2000"></textarea></label>
     <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">บันทึก</button></div></form>`;
-  $('eName').value = c.reporter_name; $('eLast').value = c.reporter_last_name || ''; $('ePhone').value = c.contact_phone; $('eCode').value = c.driver_code || '';
-  $('ePlate').value = c.plate; $('eDate').value = c.incident_date || ''; $('eStatus').value = c.status; $('eDetail').value = c.detail;
+  $('eName').value = c.reporter_name; $('ePhone').value = c.contact_phone; $('eDate').value = c.incident_date || ''; $('eDrv').value = c.driver_name || ''; $('eCode').value = c.driver_code || '';
+  $('eDrvPhone').value = c.driver_phone || ''; $('eLine').value = c.driver_line_id || ''; $('eStatus').value = c.status; $('eDetail').value = c.detail;
   $('dlg').showModal();
   $('dCancel').onclick = () => $('dlg').close();
   $('dForm').onsubmit = async (e) => {
     e.preventDefault();
-    const { error } = await sb.rpc('update_complaint', { p_complaint_id: c.id, p_reporter_name: $('eName').value, p_reporter_last_name: $('eLast').value, p_contact_phone: $('ePhone').value,
-      p_incident_date: $('eDate').value || null, p_driver_code: $('eCode').value, p_plate: $('ePlate').value, p_detail: $('eDetail').value, p_status: $('eStatus').value });
+    const { error } = await sb.rpc('update_complaint', { p_complaint_id: c.id, p_reporter_name: $('eName').value, p_contact_phone: $('ePhone').value, p_incident_date: $('eDate').value || null,
+      p_driver_name: $('eDrv').value, p_driver_code: $('eCode').value, p_driver_phone: $('eDrvPhone').value, p_driver_line_id: $('eLine').value, p_detail: $('eDetail').value, p_status: $('eStatus').value });
     if (error) return toast(errMsg(error));
     $('dlg').close(); toast('แก้ไขแล้ว'); await refreshList();
   };
@@ -365,7 +364,10 @@ async function deleteComplaint(c) {
   const { data: paths, error } = await sb.rpc('delete_complaint', { p_complaint_id: c.id });
   if (error) return toast(errMsg(error));
   let msg = 'ลบเรื่องแล้ว';
-  if (paths?.length) { const { error: e2 } = await sb.storage.from('complaint-files').remove(paths); if (e2) msg = 'ลบเรื่องแล้ว แต่ลบไฟล์แนบไม่สำเร็จ'; }
+  if (paths?.length) {   // remove ไม่ error เมื่อไม่มีสิทธิ์ ต้องนับจำนวนที่ลบได้จริง
+    const { data: gone, error: e2 } = await sb.storage.from('complaint-files').remove(paths);
+    if (e2 || (gone || []).length < paths.length) msg = 'ลบเรื่องแล้ว แต่ลบไฟล์แนบไม่ครบ กรุณาแจ้งผู้ดูแลระบบ';
+  }
   toast(msg); await refreshList();
 }
 const refreshList = async () => { await loadComplaints(); S.redraw?.(); };
