@@ -27,6 +27,7 @@ create table public.complaints (
   id uuid primary key default gen_random_uuid(),
   garage_id uuid not null references public.garages(id),
   reporter_type text not null check (reporter_type in ('passenger','garage_staff')),
+  reporter_name text not null,         -- ชื่อผู้แจ้งหรือชื่ออู่
   driver_name text,
   driver_code text,
   national_id_last4 text,              -- หน้ารายการแสดงแค่ 4 ตัวท้าย
@@ -99,7 +100,7 @@ end $$;
 
 -- ── ส่งเรื่อง (ทางเดียวที่ผู้ไม่ได้ login เขียนข้อมูลได้) ──
 create function public.submit_complaint(
-  p_garage_id uuid, p_reporter_type text, p_driver_name text, p_driver_code text,
+  p_garage_id uuid, p_reporter_type text, p_reporter_name text, p_driver_name text, p_driver_code text,
   p_national_id text, p_plate text, p_detail text, p_contact_phone text,
   p_consent boolean, p_files jsonb default '[]'::jsonb, p_website text default null
 ) returns uuid
@@ -111,6 +112,7 @@ declare
   v_phone text := regexp_replace(coalesce(p_contact_phone,''), '[^0-9]', '', 'g');
   v_code text := nullif(upper(btrim(coalesce(p_driver_code,''))), '');
   v_name text := nullif(btrim(coalesce(p_driver_name,'')), '');
+  v_reporter text := btrim(coalesce(p_reporter_name,''));
   v_plate text := btrim(coalesce(p_plate,''));
   v_detail text := btrim(coalesce(p_detail,''));
   f jsonb;
@@ -123,6 +125,7 @@ begin
     raise exception 'กรุณาเลือกอู่' using errcode = 'P0001'; end if;
   if p_reporter_type not in ('passenger','garage_staff') then
     raise exception 'กรุณาเลือกประเภทผู้แจ้ง' using errcode = 'P0001'; end if;
+  if char_length(v_reporter) not between 2 and 100 then raise exception 'กรุณากรอกชื่อผู้แจ้งหรือชื่ออู่' using errcode = 'P0001'; end if;
   if char_length(v_plate) not between 2 and 20 then raise exception 'กรุณากรอกทะเบียนรถ' using errcode = 'P0001'; end if;
   if char_length(v_detail) not between 10 and 2000 then
     raise exception 'รายละเอียดต้องยาว 10–2,000 ตัวอักษร' using errcode = 'P0001'; end if;
@@ -147,9 +150,9 @@ begin
   end if;
   insert into private.submit_rate (ip_key) values (v_ip_key);
 
-  insert into public.complaints (id, garage_id, reporter_type, driver_name, driver_code, national_id_last4,
+  insert into public.complaints (id, garage_id, reporter_type, reporter_name, driver_name, driver_code, national_id_last4,
     plate, detail, contact_phone, person_nid_key, person_code_key, consent_at)
-  values (v_id, p_garage_id, p_reporter_type, v_name, v_code, right(v_nid, 4),
+  values (v_id, p_garage_id, p_reporter_type, v_reporter, v_name, v_code, right(v_nid, 4),
     upper(v_plate), v_detail, v_phone,
     case when v_nid is not null then private.hmac_key('nid:' || v_nid) end,
     case when v_code is not null then private.hmac_key('code:' || p_garage_id || ':' || v_code) end,
@@ -226,7 +229,7 @@ grant select on public.garages to anon, authenticated;
 grant insert, update, delete on public.garages to authenticated;
 grant select, insert, update, delete on public.garage_members to authenticated;
 grant select on public.complaints, public.complaint_attachments, public.audit_log to authenticated;
-grant execute on function public.submit_complaint(uuid,text,text,text,text,text,text,text,boolean,jsonb,text) to anon, authenticated;
+grant execute on function public.submit_complaint(uuid,text,text,text,text,text,text,text,text,boolean,jsonb,text) to anon, authenticated;
 grant execute on function public.reveal_national_id(uuid), public.move_complaint(uuid,uuid,text) to authenticated;
 
 -- ── ไฟล์แนบ: กล่องส่วนตัว อัปโหลดได้แต่อ่านไม่ได้ถ้าไม่ login ─

@@ -21,7 +21,8 @@ function validate() {
   if (!$('garage').value) return 'กรุณาเลือกอู่';
   if ($('plate').value.trim().length < 2) return 'กรุณากรอกทะเบียนรถ';
   if ($('detail').value.trim().length < 10) return 'กรุณาเล่ารายละเอียดอย่างน้อย 10 ตัวอักษร';
-  if (!/^0\d{8,9}$/.test($('phone').value.replace(/\D/g, ''))) return 'เบอร์ติดต่อไม่ถูกต้อง';
+  if ($('reporterName').value.trim().length < 2) return 'กรุณากรอกชื่อผู้แจ้งหรือชื่ออู่';
+  if (!/^0\d{8,9}$/.test($('phone').value.replace(/\D/g, ''))) return 'เบอร์โทรผู้แจ้งไม่ถูกต้อง';
   const nid = $('nid').value.replace(/\D/g, '');
   if (nid && !validThaiId(nid)) return 'เลขบัตรประชาชนไม่ถูกต้อง';
   const files = [...$('files').files];
@@ -87,6 +88,7 @@ $('form').addEventListener('submit', async (e) => {
     const { data, error } = await sb.rpc('submit_complaint', {
       p_garage_id: $('garage').value,
       p_reporter_type: document.querySelector('input[name=reporter]:checked').value,
+      p_reporter_name: $('reporterName').value,
       p_driver_name: $('driverName').value,
       p_driver_code: $('driverCode').value,
       p_national_id: $('nid').value,
