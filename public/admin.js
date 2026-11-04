@@ -5,7 +5,6 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const fmt = (d) => (d ? new Date(d).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' }) : '-');
 const STATUS = { new: 'ใหม่', in_progress: 'กำลังดำเนินการ', closed: 'ปิดเรื่อง' };
 const AUDIT = { reveal_national_id: 'เปิดดูเลขบัตร', move_complaint: 'ย้ายอู่', set_status: 'เปลี่ยนสถานะ', edit_complaint: 'แก้ไขเรื่อง', set_note: 'บันทึกหมายเหตุ', delete_complaint: 'ลบเรื่อง', create_user: 'สร้างผู้ใช้', set_password: 'ตั้งรหัสผ่าน', enable_user: 'เปิดบัญชี', disable_user: 'ปิดบัญชี' };
-const REPORT_URL = location.origin + '/report';
 // ตรงกับ private.login_email ในฐานข้อมูล: ชื่อรูปแบบเดิมใช้ตรงๆ ชื่ออื่น (ไทย/เว้นวรรค) ใช้ hash
 async function toEmail(u) {
   const v = u.trim().toLowerCase().normalize('NFC');
@@ -57,11 +56,18 @@ const filterControls = (f) => `<select id="fGarage" aria-label="อู่"><opti
 const readControls = (f) => { f.garage = $('fGarage').value; f.q = $('fQ').value.trim().toLowerCase(); };
 function complaintTable(list, total) {
   return `<p class="muted">${total} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>ID</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
-    ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ') || c.driver_name || '-')}</td><td>${esc(c.contact_phone || c.driver_phone || '-')}</td><td>${esc(c.driver_code || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${S.isAdmin ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">ไม่พบเรื่อง</td></tr>'}
+    ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ') || c.driver_name || '-')}</td><td>${esc(c.contact_phone || c.driver_phone || '-')}</td><td>${esc(c.driver_code || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${canEdit(c) ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">ไม่พบเรื่อง</td></tr>'}
   </tbody></table></div>`;
 }
 
 // ── กราฟ: สีเดียว แท่งบาง เส้นตารางจาง · ไม่ใช้ style ในบรรทัดเพราะ CSP ปิดไว้ ──
+// สีประจำอู่ตามลำดับที่สร้าง สีจึงไม่เปลี่ยนเมื่อกรองหรือเรียงใหม่ · เกิน 8 อู่ใช้สีเทา
+const GARAGE_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+const OTHER_COLOR = '#8a8986';
+function garageColor(id) {
+  const i = [...S.garages].sort((a, b) => a.created_at.localeCompare(b.created_at)).findIndex((g) => g.id === id);
+  return GARAGE_COLORS[i] || OTHER_COLOR;
+}
 const niceMax = (v) => { if (v <= 4) return Math.max(v, 1); const p = 10 ** Math.floor(Math.log10(v)), n = v / p; return (n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
 function monthChart(el, rows, from, to) {
   const W = Math.max(el.clientWidth, 280), H = 220, L = 30, R = 8, T = 22, B = 26;
@@ -70,18 +76,23 @@ function monthChart(el, rows, from, to) {
   const ticks = max <= 4 ? Array.from({ length: max + 1 }, (_, i) => i) : [0, max / 2, max];
   const bars = rows.map((r, i) => {
     const x = L + step * i + (step - bw) / 2, yy = y(r.n), h = H - B - yy, on = r.ym >= from.slice(0, 7) && r.ym <= to.slice(0, 7), last = i === rows.length - 1;
-    const rad = Math.min(4, h, bw / 2);
-    const bar = r.n ? `<path class="bar ${on ? '' : 'dim'}" d="M${x} ${H - B}V${yy + rad}Q${x} ${yy} ${x + rad} ${yy}H${x + bw - rad}Q${x + bw} ${yy} ${x + bw} ${yy + rad}V${H - B}Z"/>` : '';
+    // ซ้อนแท่งตามอู่ เว้น 2px ระหว่างอู่ · มุมโค้งเฉพาะบนสุด · เดือนนอกช่วงที่เลือกจางลง
+    let cur = H - B; const unit = r.n ? h / r.n : 0;
+    const bar = (r.seg || []).map((g, si, arr) => {
+      const sh = g.n * unit, top2 = cur - sh, topMost = si === arr.length - 1, gap = topMost ? 0 : 2, ht = Math.max(1, sh - gap), yTop = top2 + gap, rad = topMost ? Math.min(4, ht, bw / 2) : 0;
+      cur = top2;
+      return `<path fill="${garageColor(g.id)}" ${on ? '' : 'opacity="0.35"'} d="M${x} ${yTop + ht}V${yTop + rad}Q${x} ${yTop} ${x + rad} ${yTop}H${x + bw - rad}Q${x + bw} ${yTop} ${x + bw} ${yTop + rad}V${yTop + ht}Z"/>`;
+    }).join('');
     const val = r.n && (r.n === top || last) ? `<text class="val" x="${x + bw / 2}" y="${yy - 6}" text-anchor="middle">${r.n}</text>` : '';
     const lab = (rows.length - 1 - i) % every === 0 ? `<text class="axis" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${monthLabel(r.ym)}</text>` : '';
-    return `<g><rect class="hit" x="${L + step * i}" y="${T}" width="${step}" height="${H - T}" data-tip="${esc(monthLabel(r.ym, true))}: ${r.n} เรื่อง"/>${bar}${val}${lab}</g>`;
+    return `<g><rect class="hit" x="${L + step * i}" y="${T}" width="${step}" height="${H - T}" data-tip="${esc(monthLabel(r.ym, true))}: ${r.n} เรื่อง${(r.seg || []).length ? ' (' + r.seg.map((g) => gName(g.id) + ' ' + g.n).join(', ') + ')' : ''}"/>${bar}${val}${lab}</g>`;
   }).join('');
   el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="จำนวนเรื่องรายเดือน 12 เดือนล่าสุด">
     ${ticks.map((t) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`).join('')}${bars}</svg>`;
 }
 const hBars = (rows) => {
   const max = Math.max(1, ...rows.map((r) => r.n));
-  return rows.length ? `<div class="hbars">${rows.map((r) => `<div class="hbar" data-tip="${esc(r.label)}: ${r.n} เรื่อง"><span class="hlabel" title="${esc(r.label)}">${esc(r.label)}</span><svg width="100%" height="14" aria-hidden="true">${r.n ? `<rect class="bar" width="${(r.n / max) * 100}%" height="14" rx="4"/>` : ''}</svg><b>${r.n}</b></div>`).join('')}</div>` : '<p class="muted">ไม่มีข้อมูล</p>';
+  return rows.length ? `<div class="hbars">${rows.map((r) => `<div class="hbar" data-tip="${esc(r.label)}: ${r.n} เรื่อง"><span class="hlabel" title="${esc(r.label)}"><i class="swatch"><svg width="10" height="10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="${r.color}"/></svg></i>${esc(r.label)}</span><svg width="100%" height="14" aria-hidden="true">${r.n ? `<rect fill="${r.color}" width="${(r.n / max) * 100}%" height="14" rx="4"/>` : ''}</svg><b>${r.n}</b></div>`).join('')}</div>` : '<p class="muted">ไม่มีข้อมูล</p>';
 };
 
 // ── โหลดข้อมูล ──
@@ -137,7 +148,7 @@ $('logoutBtn').addEventListener('click', async () => { await sb.auth.signOut(); 
 // ── เมนู ──
 function tabs() {
   const t = [['home', 'ภาพรวม'], ['link', 'ฟอร์มร้องเรียน'], ['complaints', 'เรื่องร้องเรียน']];
-  if (S.isAdmin) t.push(['garages', 'จัดการอู่'], ['users', 'ผู้ใช้งาน'], ['audit', 'ประวัติ']);
+  if (S.isAdmin) t.push(['garages', 'จัดการอู่'], ['audit', 'ประวัติ']);
   return t;
 }
 function renderNav() {
@@ -153,7 +164,7 @@ async function go(tab) {
   try {
     await loadGarages();
     if (['home', 'complaints'].includes(tab)) await loadComplaints();
-    if (tab === 'users') await loadUsers();
+    if (tab === 'garages') await loadUsers();
     if (tok !== goToken) return;
     await VIEWS[tab]();
   } catch (e) {
@@ -175,7 +186,7 @@ const VIEWS = {
       </div>
       <p class="muted" id="dPeriod"></p>
       <div class="charts">
-        <section class="panel wide"><h3>จำนวนเรื่องตามเดือน <span class="muted">12 เดือนล่าสุด</span></h3><div id="cMonth"></div></section>
+        <section class="panel wide"><h3>จำนวนเรื่องตามเดือน <span class="muted">12 เดือนล่าสุด</span></h3><div id="cLegend" class="legend"></div><div id="cMonth"></div></section>
         <section class="panel wide"><h3>ตามอู่ <span class="muted">ในช่วงที่เลือก</span></h3><div id="cGarage"></div></section>
       </div>`;
     const redraw = () => {
@@ -187,9 +198,14 @@ const VIEWS = {
       const list = base.filter((c) => inRange(c, f.from, f.to));   // เรียงล่าสุดก่อนจากตอนโหลดแล้ว
       $('dPeriod').textContent = f.from || f.to ? `ช่วงที่แสดง: ${fmtDate(f.from)} ถึง ${fmtDate(f.to)}` : 'ช่วงที่แสดง: ทั้งหมด';
       const ym = bkk().slice(0, 7);
-      const months = Array.from({ length: 12 }, (_, i) => addMonths(ym, i - 11)).map((m) => ({ ym: m, n: base.filter((c) => bkk(c.created_at).slice(0, 7) === m).length }));
+      const months = Array.from({ length: 12 }, (_, i) => addMonths(ym, i - 11)).map((m) => {
+        const rows = base.filter((c) => bkk(c.created_at).slice(0, 7) === m);
+        return { ym: m, n: rows.length, seg: S.garages.map((g) => ({ id: g.id, n: rows.filter((c) => c.garage_id === g.id).length })).filter((g) => g.n) };
+      });
+      const shownG = S.garages.filter((g) => months.some((r) => r.seg.some((x) => x.id === g.id)));
+      $('cLegend').innerHTML = shownG.map((g) => `<span class="lg"><i class="swatch"><svg width="10" height="10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="${garageColor(g.id)}"/></svg></i>${esc(g.name)}</span>`).join('');
       monthChart($('cMonth'), months, f.from || '0000-00', f.to || '9999-99');
-      $('cGarage').innerHTML = hBars(S.garages.map((g) => ({ label: g.name, n: list.filter((c) => c.garage_id === g.id).length })).filter((r) => r.n || !f.garage).sort((a, b) => b.n - a.n));
+      $('cGarage').innerHTML = hBars(S.garages.map((g) => ({ label: g.name, color: garageColor(g.id), n: list.filter((c) => c.garage_id === g.id).length })).filter((r) => r.n || !f.garage).sort((a, b) => b.n - a.n));
     };
     S.redraw = redraw;
     $('dStats').onclick = (e) => {
@@ -228,54 +244,31 @@ const VIEWS = {
     redraw();
   },
 
-  // ── ฟอร์มร้องเรียน: ฟอร์มเต็มจอ + ลิงก์/QR ขนาดเล็ก ──
+  // ── ฟอร์มร้องเรียน: ฟอร์มเต็มจอ ──
   async link() {
-    $('view').innerHTML = `<div class="form-head"><h2>ฟอร์มร้องเรียน</h2>
-        <div class="qr-mini"><div id="qrBox"></div><div class="qr-text"><b>ลิงก์ฟอร์มร้องเรียน</b><span class="link-url" id="reportUrl"></span>
-          <div class="qr-btns"><button type="button" id="copyLink" class="small">คัดลอกลิงก์</button><button type="button" id="dlQr" class="ghost small">ดาวน์โหลด QR</button></div></div></div></div>
-      <iframe id="formFrame" class="form-frame" src="/report?embed=1" title="ฟอร์มร้องเรียน"></iframe>`;
-    $('reportUrl').textContent = REPORT_URL.replace(/^https?:\/\//, '');
-    const qr = new window.QRCodeStyling({ width: 300, height: 300, type: 'canvas', data: REPORT_URL, margin: 8,
-      dotsOptions: { type: 'rounded', color: '#15803d' }, cornersSquareOptions: { type: 'extra-rounded', color: '#166534' },
-      cornersDotOptions: { type: 'dot', color: '#166534' }, backgroundOptions: { color: '#ffffff' }, qrOptions: { errorCorrectionLevel: 'Q' } });
-    qr.append($('qrBox'));
-    $('copyLink').onclick = async () => { await navigator.clipboard.writeText(REPORT_URL); toast('คัดลอกลิงก์แล้ว'); };
-    $('dlQr').onclick = () => qr.download({ name: 'qr-แจ้งเรื่องแท็กซี่', extension: 'png' });
+    $('view').innerHTML = `<h2>ฟอร์มร้องเรียน</h2><iframe id="formFrame" class="form-frame" src="/report?embed=1" title="ฟอร์มร้องเรียน"></iframe>`;
     // ให้ความสูงกรอบเท่าฟอร์ม หน้าจะเลื่อนชั้นเดียว
     const fr = $('formFrame');
     fr.onload = () => { const doc = fr.contentDocument; if (!doc) return; const fit = () => { fr.style.height = doc.documentElement.scrollHeight + 'px'; }; fit(); new ResizeObserver(fit).observe(doc.body); };
   },
 
-  // ── จัดการอู่ ──
+  // ── จัดการอู่ + บัญชีผู้ใช้ ──
   garages() {
+    const usersOf = (id) => S.users.filter((u) => u.garage_id === id).map((u) => u.username).join(', ') || '-';
     $('view').innerHTML = `<h2>จัดการอู่</h2>
-      <div class="row panel"><button type="button" id="addGarage">เพิ่มอู่</button></div>
-      <div class="scroll"><table><thead><tr><th>รหัส</th><th>ชื่ออู่</th><th>ที่อยู่</th><th>Contact Person</th><th>Contact Number</th><th>สถานะ</th><th></th></tr></thead><tbody>
-      ${S.garages.map((g) => `<tr><td>${esc(g.code || '-')}</td><td>${esc(g.name)}</td><td class="clip" title="${esc(g.address || '')}">${esc(g.address || '-')}</td><td>${esc(g.contact_person || '-')}</td><td>${esc(g.contact_number || '-')}</td><td><span class="tag ${g.is_active ? 'closed' : 'off'}">${g.is_active ? 'เปิดรับเรื่อง' : 'ปิดรับเรื่อง'}</span></td>
-        <td class="actions"><button type="button" class="ghost" data-grename="${g.id}">แก้ไข</button><button type="button" class="ghost" data-gtoggle="${g.id}">${g.is_active ? 'ปิดรับเรื่อง' : 'เปิดรับเรื่อง'}</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">ยังไม่มีอู่</td></tr>'}
-      </tbody></table></div>`;
-    $('addGarage').onclick = () => openGarageForm();
-  },
-
-  // ── ผู้ใช้งาน ──
-  users() {
-    $('view').innerHTML = `<h2>ผู้ใช้งาน</h2>
-      <form id="addUser" class="panel grid"><label>ชื่อผู้ใช้ <input id="uName" required minlength="2" maxlength="50" autocomplete="off" autocapitalize="none" placeholder="ตั้งชื่ออะไรก็ได้"></label>
-        <label>รหัสผ่าน <input id="uPass" type="text" required minlength="8" maxlength="72" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร"></label>
-        <label>สิทธิ์ <select id="uGarage"><option value="">เลือกอู่</option>${S.garages.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}<option value="__admin">ผู้ดูแลระบบ (เห็นทุกอู่)</option></select></label>
-        <button type="submit">สร้างผู้ใช้</button></form>
+      <div class="row panel"><button type="button" id="addGarage">เพิ่มอู่พร้อมบัญชีผู้ใช้</button></div>
+      <div class="scroll"><table><thead><tr><th>รหัส</th><th>ชื่ออู่</th><th>ผู้ใช้</th><th>ที่อยู่</th><th>Contact Person</th><th>Contact Number</th><th>สถานะ</th><th></th></tr></thead><tbody>
+      ${S.garages.map((g) => `<tr><td>${esc(g.code || '-')}</td><td>${esc(g.name)}</td><td>${esc(usersOf(g.id))}</td><td class="clip" title="${esc(g.address || '')}">${esc(g.address || '-')}</td><td>${esc(g.contact_person || '-')}</td><td>${esc(g.contact_number || '-')}</td><td><span class="tag ${g.is_active ? 'closed' : 'off'}">${g.is_active ? 'เปิดรับเรื่อง' : 'ปิดรับเรื่อง'}</span></td>
+        <td class="actions"><button type="button" class="ghost" data-grename="${g.id}">แก้ไข</button><button type="button" class="ghost" data-uadd="${g.id}">เพิ่มผู้ใช้</button><button type="button" class="ghost" data-gtoggle="${g.id}">${g.is_active ? 'ปิดรับเรื่อง' : 'เปิดรับเรื่อง'}</button></td></tr>`).join('') || '<tr><td colspan="8" class="muted">ยังไม่มีอู่</td></tr>'}
+      </tbody></table></div>
+      <h3 class="sec">บัญชีผู้ใช้ทั้งหมด</h3>
+      <div class="row panel"><button type="button" class="ghost" id="addAdmin">เพิ่มผู้ดูแลระบบ</button></div>
       <div class="scroll"><table><thead><tr><th>ชื่อผู้ใช้</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>
       ${S.users.map((u) => `<tr><td>${esc(u.username)}</td><td>${u.role === 'admin' ? 'ผู้ดูแลระบบ' : esc(u.garage_name)}</td><td><span class="tag ${u.active ? 'closed' : 'off'}">${u.active ? 'ใช้งาน' : 'ปิดบัญชี'}</span></td><td>${fmt(u.last_sign_in_at)}</td>
         <td class="actions"><button type="button" class="ghost" data-upass="${u.user_id}">ตั้งรหัสใหม่</button>${u.user_id === S.me.id ? '' : `<button type="button" class="ghost" data-utoggle="${u.user_id}" data-active="${u.active}">${u.active ? 'ปิดบัญชี' : 'เปิดบัญชี'}</button>`}</td></tr>`).join('')}
       </tbody></table></div>`;
-    $('addUser').onsubmit = async (e) => {
-      e.preventDefault();
-      const g = $('uGarage').value;
-      if (!g) return toast('กรุณาเลือกอู่หรือสิทธิ์');
-      const { error } = await sb.rpc('admin_create_user', { p_username: $('uName').value, p_password: $('uPass').value, p_garage_id: g === '__admin' ? null : g });
-      if (error) return toast(errMsg(error));
-      toast('สร้างผู้ใช้แล้ว'); go('users');
-    };
+    $('addGarage').onclick = () => openGarageForm();
+    $('addAdmin').onclick = () => openUserForm(null);
   },
 
   // ── ประวัติ ──
@@ -363,16 +356,35 @@ function openComplaintEdit(c) {
 }
 async function deleteComplaint(c) {
   if (!confirm(`ลบเรื่อง ${c.ref_no} และไฟล์แนบทั้งหมด? ลบแล้วกู้คืนไม่ได้`)) return;
-  const { data: paths, error } = await sb.rpc('delete_complaint', { p_complaint_id: c.id });
-  if (error) return toast(errMsg(error));
+  // ลบไฟล์ก่อน เพราะสิทธิ์ลบไฟล์ตรวจจากแถวไฟล์แนบที่ยังอยู่ · remove ไม่ error เมื่อไม่มีสิทธิ์ ต้องนับจำนวนที่ลบได้จริง
+  const { data: files } = await sb.from('complaint_attachments').select('storage_path').eq('complaint_id', c.id);
+  const paths = (files || []).map((f) => f.storage_path);
   let msg = 'ลบเรื่องแล้ว';
-  if (paths?.length) {   // remove ไม่ error เมื่อไม่มีสิทธิ์ ต้องนับจำนวนที่ลบได้จริง
+  if (paths.length) {
     const { data: gone, error: e2 } = await sb.storage.from('complaint-files').remove(paths);
     if (e2 || (gone || []).length < paths.length) msg = 'ลบเรื่องแล้ว แต่ลบไฟล์แนบไม่ครบ กรุณาแจ้งผู้ดูแลระบบ';
   }
+  const { error } = await sb.rpc('delete_complaint', { p_complaint_id: c.id });
+  if (error) return toast(errMsg(error));
   toast(msg); await refreshList();
 }
 const refreshList = async () => { await loadComplaints(); S.redraw?.(); };
+
+// garageId = null คือเพิ่มผู้ดูแลระบบ
+function openUserForm(garageId) {
+  $('dlgBody').innerHTML = `<h2>${garageId ? 'เพิ่มผู้ใช้ของ ' + esc(gName(garageId)) : 'เพิ่มผู้ดูแลระบบ'}</h2><form id="dForm">
+    <label>ชื่อผู้ใช้ <input id="uName" required minlength="2" maxlength="50" autocomplete="off" autocapitalize="none" placeholder="ตั้งชื่ออะไรก็ได้"></label>
+    <label>รหัสผ่าน <input id="uPass" type="text" required minlength="8" maxlength="72" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร"></label>
+    <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">สร้างผู้ใช้</button></div></form>`;
+  $('dlg').showModal();
+  $('dCancel').onclick = () => $('dlg').close();
+  $('dForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.rpc('admin_create_user', { p_username: $('uName').value, p_password: $('uPass').value, p_garage_id: garageId });
+    if (error) return toast(errMsg(error));
+    $('dlg').close(); toast('สร้างผู้ใช้แล้ว'); go('garages');
+  };
+}
 
 function openGarageForm(g) {
   $('dlgBody').innerHTML = `<h2>${g ? 'แก้ไขอู่' : 'เพิ่มอู่'}</h2><form id="dForm">
@@ -381,6 +393,9 @@ function openGarageForm(g) {
     <label>ที่อยู่ <textarea id="gAddress" rows="2" maxlength="500"></textarea></label>
     <label>Contact Person <input id="gPerson" maxlength="100" autocomplete="off"></label>
     <label>Contact Number <input id="gNumber" inputmode="tel" maxlength="30" autocomplete="off"></label>
+    ${g ? '' : `<h3>บัญชีเข้าใช้งานของอู่</h3>
+    <label>ชื่อผู้ใช้ <input id="gUser" required minlength="2" maxlength="50" autocomplete="off" autocapitalize="none" placeholder="ตั้งชื่ออะไรก็ได้"></label>
+    <label>รหัสผ่าน <input id="gPass" type="text" required minlength="8" maxlength="72" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร"></label>`}
     <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">บันทึก</button></div></form>`;
   $('gName').value = g?.name || ''; $('gCode').value = g?.code || ''; $('gAddress').value = g?.address || ''; $('gPerson').value = g?.contact_person || ''; $('gNumber').value = g?.contact_number || '';
   $('dlg').showModal();
@@ -389,9 +404,10 @@ function openGarageForm(g) {
     e.preventDefault();
     const row = { name: $('gName').value.trim(), code: $('gCode').value.trim().toUpperCase(), address: $('gAddress').value.trim() || null, contact_person: $('gPerson').value.trim() || null, contact_number: $('gNumber').value.trim() || null };
     if (!row.name) return toast('กรุณากรอกชื่ออู่');
-    const { error } = g ? await sb.from('garages').update(row).eq('id', g.id) : await sb.from('garages').insert(row);
+    const { error } = g ? await sb.from('garages').update(row).eq('id', g.id)
+      : await sb.rpc('admin_create_garage', { p_name: row.name, p_code: row.code, p_address: row.address, p_contact_person: row.contact_person, p_contact_number: row.contact_number, p_username: $('gUser').value, p_password: $('gPass').value });
     if (error) return toast(error.code === '23505' ? 'ชื่อหรือรหัสอู่นี้มีอยู่แล้ว' : errMsg(error));
-    $('dlg').close(); toast(g ? 'แก้ไขอู่แล้ว' : 'เพิ่มอู่แล้ว'); go('garages');
+    $('dlg').close(); toast(g ? 'แก้ไขอู่แล้ว' : 'เพิ่มอู่และบัญชีผู้ใช้แล้ว'); go('garages');
   };
 }
 
@@ -411,11 +427,12 @@ $('changePwBtn').addEventListener('click', () => openForm('เปลี่ยน
 
 // ── ปุ่มในตาราง ──
 $('view').addEventListener('click', async (e) => {
-  const d = e.target.closest('[data-open],[data-cedit],[data-cdel],[data-grename],[data-gtoggle],[data-upass],[data-utoggle]')?.dataset;
+  const d = e.target.closest('[data-open],[data-cedit],[data-cdel],[data-uadd],[data-grename],[data-gtoggle],[data-upass],[data-utoggle]')?.dataset;
   if (!d) return;
   if (d.open) return openComplaint(d.open);
   if (d.cedit) return openComplaintEdit(S.complaints.find((x) => x.id === d.cedit));
   if (d.cdel) return deleteComplaint(S.complaints.find((x) => x.id === d.cdel));
+  if (d.uadd) return openUserForm(d.uadd);
   if (d.grename) return openGarageForm(S.garages.find((x) => x.id === d.grename));
   if (d.gtoggle) {
     const g = S.garages.find((x) => x.id === d.gtoggle);
@@ -436,7 +453,7 @@ $('view').addEventListener('click', async (e) => {
     if (!on && !confirm('ปิดบัญชีนี้? ผู้ใช้จะเข้าระบบไม่ได้ทันที')) return;
     const { error } = await sb.rpc('admin_set_user_active', { p_user_id: d.utoggle, p_active: on });
     if (error) return toast(errMsg(error));
-    go('users');
+    go('garages');
   }
 });
 // กล่องข้อมูลเมื่อชี้กราฟ (ตั้งตำแหน่งผ่าน JS ได้ภายใต้ CSP)

@@ -16,6 +16,8 @@
 <main>
   <div id="notice" class="notice" hidden role="alert"></div>
 
+  <section id="needLogin" class="panel-msg" hidden><h2>กรุณาเข้าสู่ระบบก่อน</h2><p>ฟอร์มนี้สำหรับอู่ที่มีบัญชีเท่านั้น</p><a class="btn-login" href="/">ไปหน้าเข้าสู่ระบบ</a></section>
+
   <form id="form" novalidate>
     <label>อู่แท็กซี่ <b>*</b>
       <select id="garage" required><option value="">กำลังโหลด…</option></select>
@@ -24,11 +26,11 @@
       <input id="incidentDate" type="date" required>
     </label>
 
-    <h2>ข้อมูลคนขับ <small>(กรอกเท่าที่ทราบ)</small></h2>
+    <h2>ข้อมูลคนขับ <small>(ช่องอื่นกรอกเท่าที่ทราบ)</small></h2>
     <label>ชื่อคนขับ <input id="driverName" maxlength="100" autocomplete="off"></label>
     <label>รหัสคนขับ <input id="driverCode" maxlength="30" autocomplete="off"></label>
-    <label>เลขบัตรประชาชนคนขับ
-      <input id="nid" inputmode="numeric" maxlength="17" autocomplete="off" placeholder="ตัวเลข 13 หลัก">
+    <label>เลขบัตรประชาชนคนขับ <b>*</b>
+      <input id="nid" required inputmode="numeric" maxlength="17" autocomplete="off" placeholder="ตัวเลข 13 หลัก">
     </label>
     <label>มือถือ <input id="driverPhone" inputmode="tel" maxlength="15" autocomplete="off" placeholder="08x-xxx-xxxx"></label>
     <label>Line ID <input id="driverLine" maxlength="50" autocomplete="off" autocapitalize="none"></label>
@@ -40,8 +42,6 @@
       <input id="files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf">
     </label>
     <ul id="fileList" class="file-list" hidden></ul>
-
-    <label class="hp" aria-hidden="true">เว็บไซต์ <input id="website" tabindex="-1" autocomplete="off"></label>
 
     <button id="submit" type="submit">ส่งเรื่อง</button>
   </form>

@@ -38,3 +38,8 @@ input[type=date] { -webkit-appearance: none; appearance: none; min-height: 48px;
 input[type=date]::-webkit-date-and-time-value { text-align: left; }
 .embed .top { display: none; }
 .embed main { max-width: none; padding: 0; }
+.panel-msg { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+.panel-msg[hidden] { display: none; }
+.panel-msg h2 { border: 0; padding: 0; margin: 0 0 6px; }
+.btn-login { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 8px; background: var(--green); color: #fff; font-weight: 700; text-decoration: none; }
+select:disabled { background: #f3f4f6; color: var(--text); opacity: 1; }
