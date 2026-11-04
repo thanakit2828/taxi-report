@@ -10,6 +10,8 @@ function notice(msg) {
   if (msg) $('notice').scrollIntoView({ block: 'center' });
 }
 
+const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+
 function validThaiId(v) {
   if (!/^\d{13}$/.test(v)) return false;
   let sum = 0;
@@ -21,6 +23,8 @@ function validate() {
   if (!$('garage').value) return 'กรุณาเลือกอู่';
   if ($('plate').value.trim().length < 2) return 'กรุณากรอกทะเบียนรถ';
   if ($('detail').value.trim().length < 10) return 'กรุณาเล่ารายละเอียดอย่างน้อย 10 ตัวอักษร';
+  if (!$('incidentDate').value) return 'กรุณาเลือกวันเกิดเหตุ';
+  if ($('incidentDate').value > today()) return 'วันเกิดเหตุต้องไม่เกินวันนี้';
   if ($('reporterName').value.trim().length < 2) return 'กรุณากรอกชื่อผู้แจ้งหรือชื่ออู่';
   if (!/^0\d{8,9}$/.test($('phone').value.replace(/\D/g, ''))) return 'เบอร์โทรผู้แจ้งไม่ถูกต้อง';
   const nid = $('nid').value.replace(/\D/g, '');
@@ -89,6 +93,8 @@ $('form').addEventListener('submit', async (e) => {
       p_garage_id: $('garage').value,
       p_reporter_type: document.querySelector('input[name=reporter]:checked').value,
       p_reporter_name: $('reporterName').value,
+      p_reporter_last_name: $('reporterLastName').value,
+      p_incident_date: $('incidentDate').value,
       p_driver_name: $('driverName').value,
       p_driver_code: $('driverCode').value,
       p_national_id: $('nid').value,
@@ -100,7 +106,8 @@ $('form').addEventListener('submit', async (e) => {
       p_website: $('website').value,
     });
     if (error) throw new Error(error.code === 'P0001' ? error.message : 'ส่งเรื่องไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-    $('ref').textContent = String(data).slice(0, 8).toUpperCase();
+    const { data: refNo } = await sb.rpc('complaint_ref', { p_id: data });
+    $('ref').textContent = refNo || String(data).slice(0, 8).toUpperCase();
     $('form').hidden = true; $('done').hidden = false;
     window.scrollTo(0, 0);
   } catch (err) {
@@ -115,4 +122,5 @@ $('again').addEventListener('click', () => {
   $('done').hidden = true; $('form').hidden = false;
 });
 
+$('incidentDate').max = today();
 loadGarages();

@@ -11,7 +11,7 @@
 .who { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: .9rem; }
 .bar .ghost { border: 1px solid rgb(255 255 255 / .5); }
 
-main.wide { max-width: 1180px; }
+main.wide { max-width: 1400px; }
 main h2 { border: 0; padding: 0; margin: 8px 0 12px; font-size: 1.3rem; }
 .muted { color: var(--muted); font-weight: 400; }
 .row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
@@ -29,12 +29,15 @@ button.small { min-height: 30px; padding: 0 10px; font-size: .85rem; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .stat, .panel, .card, .scroll { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
 .stat { padding: 14px; }
+button.stat { display: block; width: 100%; min-height: 0; text-align: left; color: inherit; font-weight: 400; border: 2px solid transparent; }
+button.stat:hover { background: #f0fdf4; }
+button.stat.on { border-color: var(--green); }
 .stat b { display: block; font-size: 1.8rem; color: var(--green-dark); line-height: 1.2; }
 .stat span { color: var(--muted); font-size: .9rem; }
 .panel { padding: 14px; margin-bottom: 14px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; align-items: end; }
 .grid label { margin: 0; }
-.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; margin-bottom: 8px; }
 .filters input, .filters select { margin: 0 !important; }
 
 .scroll { overflow-x: auto; }
@@ -69,3 +72,35 @@ dialog h2 { margin: 0 0 12px; border: 0; padding: 0; }
 dialog h3 { margin: 14px 0 4px; font-size: 1rem; }
 .prewrap { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 50; background: #1f2937; color: #fff; padding: 10px 16px; border-radius: 8px; max-width: calc(100vw - 32px); }
+.inline { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 500; white-space: nowrap; }
+.inline input { flex: 1; min-width: 0; }
+td.clip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.charts .panel { margin: 0; min-width: 0; }
+.charts .wide { grid-column: 1 / -1; }
+.charts h3, #view > h3 { margin: 0 0 10px; font-size: 1rem; }
+#view > h3 { margin-top: 8px; }
+.charts h3 .muted { font-size: .85rem; }
+.bar { fill: var(--green); }
+.bar.dim { fill: #a7d7b8; }
+.grid-line, line.grid { stroke: #e5e7eb; stroke-width: 1; }
+text.axis { fill: var(--muted); font-size: 12px; }
+text.val { fill: var(--text); font-size: 12px; font-weight: 700; }
+rect.hit { fill: transparent; }
+rect.hit:hover { fill: rgb(0 0 0 / .04); }
+.hbars { display: grid; gap: 8px; }
+.hbar { display: grid; grid-template-columns: minmax(70px, 34%) 1fr 34px; align-items: center; gap: 8px; font-size: .9rem; }
+.hlabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar b { text-align: right; font-variant-numeric: tabular-nums; }
+.chart-tip { position: fixed; z-index: 60; pointer-events: none; background: #1f2937; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: .85rem; white-space: nowrap; }
+.chart-tip[hidden] { display: none; }
+@media (max-width: 640px) { .charts { grid-template-columns: minmax(0, 1fr); } }
+dialog textarea { display: block; width: 100%; margin-top: 4px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.admin button.ico { width: 28px; min-height: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: transparent; color: #9ca3af; }
+.icons { display: flex; gap: 4px; }
+.admin button.ico.view { background: #fff7ed; color: #f97316; border: 1px solid #fed7aa; }
+.admin button.ico.view:hover { background: #ffedd5; }
+.admin button.ico.edit:hover { background: #fff7ed; color: #ea580c; }
+.admin button.ico.del:hover { background: #fef2f2; color: #dc2626; }
+th.stick, td.stick { position: sticky; right: 0; background: #fff; box-shadow: -1px 0 0 #e5e7eb; }
+th.stick { background: #f0fdf4; }

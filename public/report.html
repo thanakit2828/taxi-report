@@ -33,8 +33,14 @@
     <label>รายละเอียด <b>*</b>
       <textarea id="detail" required rows="5" maxlength="2000" placeholder="เกิดอะไรขึ้น เมื่อไร ที่ไหน"></textarea>
     </label>
+    <label>วันเกิดเหตุ <b>*</b>
+      <input id="incidentDate" type="date" required>
+    </label>
     <label>ชื่อผู้แจ้งหรือชื่ออู่ <b>*</b>
-      <input id="reporterName" required maxlength="100" autocomplete="name">
+      <input id="reporterName" required maxlength="100" autocomplete="given-name">
+    </label>
+    <label>นามสกุล <small>(ถ้าแจ้งในนามอู่ เว้นว่างได้)</small>
+      <input id="reporterLastName" maxlength="100" autocomplete="family-name">
     </label>
     <label>เบอร์โทรผู้แจ้ง <b>*</b>
       <input id="phone" required inputmode="tel" maxlength="15" autocomplete="tel" placeholder="08x-xxx-xxxx">
@@ -55,7 +61,7 @@
 
     <label class="choice consent">
       <input id="consent" type="checkbox" required>
-      <span>ฉันยินยอมให้เก็บข้อมูลนี้ เพื่อให้เจ้าของอู่และผู้ดูแลระบบใช้ตรวจสอบเรื่องที่แจ้ง และติดต่อกลับ <b>*</b></span>
+      <span>ฉันยินยอมให้เก็บข้อมูลนี้ เพื่อให้เจ้าของอู่ทุกอู่ในระบบและผู้ดูแลระบบเห็นและใช้ตรวจสอบเรื่องที่แจ้ง และติดต่อกลับ <b>*</b></span>
     </label>
 
     <button id="submit" type="submit">ส่งเรื่อง</button>
