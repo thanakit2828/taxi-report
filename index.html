@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แจ้งเรื่องแท็กซี่</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top"><h1>แจ้งเรื่องแท็กซี่</h1><p>แจ้งปัญหาการใช้บริการให้เจ้าของอู่รับทราบ</p></header>
+
+<main>
+  <div id="notice" class="notice" hidden role="alert"></div>
+
+  <form id="form" novalidate>
+    <label>อู่แท็กซี่ <b>*</b>
+      <select id="garage" required><option value="">กำลังโหลด…</option></select>
+    </label>
+
+    <fieldset>
+      <legend>คุณคือ <b>*</b></legend>
+      <label class="choice"><input type="radio" name="reporter" value="passenger" checked> ผู้โดยสาร</label>
+      <label class="choice"><input type="radio" name="reporter" value="garage_staff"> พนักงานอู่</label>
+    </fieldset>
+
+    <label>ทะเบียนรถ <b>*</b>
+      <input id="plate" required maxlength="20" autocomplete="off" placeholder="เช่น 1กข 1234">
+    </label>
+    <label>รายละเอียด <b>*</b>
+      <textarea id="detail" required rows="5" maxlength="2000" placeholder="เกิดอะไรขึ้น เมื่อไร ที่ไหน"></textarea>
+    </label>
+    <label>เบอร์ติดต่อกลับ <b>*</b>
+      <input id="phone" required inputmode="tel" maxlength="15" autocomplete="tel" placeholder="08x-xxx-xxxx">
+    </label>
+
+    <h2>ข้อมูลคนขับ <small>(กรอกเท่าที่ทราบ)</small></h2>
+    <label>ชื่อคนขับ <input id="driverName" maxlength="100" autocomplete="off"></label>
+    <label>รหัสคนขับ <input id="driverCode" maxlength="30" autocomplete="off"></label>
+    <label>เลขบัตรประชาชนคนขับ
+      <input id="nid" inputmode="numeric" maxlength="17" autocomplete="off" placeholder="ตัวเลข 13 หลัก">
+    </label>
+
+    <label>รูปหรือเอกสารแนบ <small>(ไม่เกิน 5 ไฟล์ · รูป หรือ PDF ไม่เกิน 10 MB)</small>
+      <input id="files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf">
+    </label>
+
+    <label class="hp" aria-hidden="true">เว็บไซต์ <input id="website" tabindex="-1" autocomplete="off"></label>
+
+    <label class="choice consent">
+      <input id="consent" type="checkbox" required>
+      <span>ฉันยินยอมให้เก็บข้อมูลนี้ เพื่อให้เจ้าของอู่และผู้ดูแลระบบใช้ตรวจสอบเรื่องที่แจ้ง และติดต่อกลับ <b>*</b></span>
+    </label>
+
+    <button id="submit" type="submit">ส่งเรื่อง</button>
+  </form>
+
+  <section id="done" hidden>
+    <h2>ส่งเรื่องเรียบร้อยแล้ว</h2>
+    <p>เลขอ้างอิงของคุณ</p>
+    <p id="ref" class="ref"></p>
+    <p>โปรดเก็บเลขนี้ไว้ เจ้าของอู่จะติดต่อกลับทางเบอร์ที่แจ้งไว้</p>
+    <button id="again" type="button">แจ้งเรื่องอื่น</button>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
