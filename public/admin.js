@@ -57,7 +57,7 @@ const filterControls = (f) => `<select id="fGarage" aria-label="อู่"><opti
 const readControls = (f) => { f.garage = $('fGarage').value; f.q = $('fQ').value.trim().toLowerCase(); };
 function complaintTable(list, total) {
   return `<p class="muted">${total} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>ID</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
-    ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))}</td><td>${esc(c.contact_phone)}</td><td>${esc(c.driver_code || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${S.isAdmin ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">ไม่พบเรื่อง</td></tr>'}
+    ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ') || c.driver_name || '-')}</td><td>${esc(c.contact_phone || c.driver_phone || '-')}</td><td>${esc(c.driver_code || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${S.isAdmin ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">ไม่พบเรื่อง</td></tr>'}
   </tbody></table></div>`;
 }
 
@@ -315,7 +315,7 @@ async function openComplaint(id) {
   $('dlgBody').innerHTML = `<h2>เรื่อง ${esc(c.ref_no)}</h2>
     <dl class="detail">
       ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', esc(gName(c.garage_id)))}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
-      ${row('ผู้แจ้ง', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ')))}${row('เบอร์โทรผู้แจ้ง', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`)}
+      ${c.reporter_name ? row('ผู้แจ้ง', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))) : ''}${c.contact_phone ? row('เบอร์โทรผู้แจ้ง', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`) : ''}
       ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('รหัสคนขับ', esc(c.driver_code || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
       ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">กำลังโหลด…</span>` : '-')}
     </dl>
@@ -344,19 +344,18 @@ async function openComplaint(id) {
 
 function openComplaintEdit(c) {
   $('dlgBody').innerHTML = `<h2>แก้ไขเรื่อง ${esc(c.ref_no)}</h2><form id="dForm">
-    <div class="grid"><label>ชื่อผู้แจ้ง <input id="eName" required maxlength="100"></label><label>เบอร์โทรผู้แจ้ง <input id="ePhone" required inputmode="tel" maxlength="15"></label>
-    <label>วันเกิดเหตุ <input id="eDate" type="date" max="${bkk()}"></label><label>ชื่อคนขับ <input id="eDrv" maxlength="100"></label>
+    <div class="grid"><label>วันเกิดเหตุ <input id="eDate" type="date" max="${bkk()}"></label><label>ชื่อคนขับ <input id="eDrv" maxlength="100"></label>
     <label>ID (รหัสคนขับ) <input id="eCode" maxlength="30"></label><label>มือถือคนขับ <input id="eDrvPhone" inputmode="tel" maxlength="15"></label>
     <label>Line ID <input id="eLine" maxlength="50" autocapitalize="none"></label><label>สถานะ <select id="eStatus">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
     <label>รายละเอียด <textarea id="eDetail" rows="5" required maxlength="2000"></textarea></label>
     <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">บันทึก</button></div></form>`;
-  $('eName').value = c.reporter_name; $('ePhone').value = c.contact_phone; $('eDate').value = c.incident_date || ''; $('eDrv').value = c.driver_name || ''; $('eCode').value = c.driver_code || '';
+  $('eDate').value = c.incident_date || ''; $('eDrv').value = c.driver_name || ''; $('eCode').value = c.driver_code || '';
   $('eDrvPhone').value = c.driver_phone || ''; $('eLine').value = c.driver_line_id || ''; $('eStatus').value = c.status; $('eDetail').value = c.detail;
   $('dlg').showModal();
   $('dCancel').onclick = () => $('dlg').close();
   $('dForm').onsubmit = async (e) => {
     e.preventDefault();
-    const { error } = await sb.rpc('update_complaint', { p_complaint_id: c.id, p_reporter_name: $('eName').value, p_contact_phone: $('ePhone').value, p_incident_date: $('eDate').value || null,
+    const { error } = await sb.rpc('update_complaint', { p_complaint_id: c.id, p_incident_date: $('eDate').value || null,
       p_driver_name: $('eDrv').value, p_driver_code: $('eCode').value, p_driver_phone: $('eDrvPhone').value, p_driver_line_id: $('eLine').value, p_detail: $('eDetail').value, p_status: $('eStatus').value });
     if (error) return toast(errMsg(error));
     $('dlg').close(); toast('แก้ไขแล้ว'); await refreshList();
