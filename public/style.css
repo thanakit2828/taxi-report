@@ -25,3 +25,8 @@ button:disabled { opacity: .6; cursor: wait; }
 .notice { background: #fef2f2; color: var(--red); border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
 .ref { font-size: 1.6rem; font-weight: 700; letter-spacing: .08em; color: var(--green-dark); margin: 0 0 12px; }
 .hp { position: absolute; left: -9999px; }
+.file-list { list-style: none; margin: -6px 0 14px; padding: 0; display: grid; gap: 6px; }
+.file-list[hidden] { display: none; }
+.file-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f3f4f6; border-radius: 8px; padding: 6px 10px; font-size: .9rem; overflow-wrap: anywhere; }
+.file-list button { width: auto; min-height: 32px; padding: 0 10px; background: #fff; color: var(--red); border: 1px solid var(--line); font-weight: 500; flex: none; }
+.file-list button:hover { background: #fef2f2; }

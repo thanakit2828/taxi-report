@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top"><h1>แจ้งเรื่องแท็กซี่</h1><p>แจ้งปัญหาการใช้บริการให้เจ้าของอู่รับทราบ</p></header>
+<header class="top"><h1>แจ้งเรื่องแท็กซี่</h1><p>ฟอร์มสำหรับอู่แจ้งเรื่องคนขับ</p></header>
 
 <main>
   <div id="notice" class="notice" hidden role="alert"></div>
@@ -20,30 +20,8 @@
     <label>อู่แท็กซี่ <b>*</b>
       <select id="garage" required><option value="">กำลังโหลด…</option></select>
     </label>
-
-    <fieldset>
-      <legend>คุณคือ <b>*</b></legend>
-      <label class="choice"><input type="radio" name="reporter" value="passenger" checked> ผู้โดยสาร</label>
-      <label class="choice"><input type="radio" name="reporter" value="garage_staff"> พนักงานอู่</label>
-    </fieldset>
-
-    <label>ทะเบียนรถ <b>*</b>
-      <input id="plate" required maxlength="20" autocomplete="off" placeholder="เช่น 1กข 1234">
-    </label>
-    <label>รายละเอียด <b>*</b>
-      <textarea id="detail" required rows="5" maxlength="2000" placeholder="เกิดอะไรขึ้น เมื่อไร ที่ไหน"></textarea>
-    </label>
     <label>วันเกิดเหตุ <b>*</b>
       <input id="incidentDate" type="date" required>
-    </label>
-    <label>ชื่อผู้แจ้งหรือชื่ออู่ <b>*</b>
-      <input id="reporterName" required maxlength="100" autocomplete="given-name">
-    </label>
-    <label>นามสกุล <small>(ถ้าแจ้งในนามอู่ เว้นว่างได้)</small>
-      <input id="reporterLastName" maxlength="100" autocomplete="family-name">
-    </label>
-    <label>เบอร์โทรผู้แจ้ง <b>*</b>
-      <input id="phone" required inputmode="tel" maxlength="15" autocomplete="tel" placeholder="08x-xxx-xxxx">
     </label>
 
     <h2>ข้อมูลคนขับ <small>(กรอกเท่าที่ทราบ)</small></h2>
@@ -52,9 +30,22 @@
     <label>เลขบัตรประชาชนคนขับ
       <input id="nid" inputmode="numeric" maxlength="17" autocomplete="off" placeholder="ตัวเลข 13 หลัก">
     </label>
+    <label>มือถือ <input id="driverPhone" inputmode="tel" maxlength="15" autocomplete="off" placeholder="08x-xxx-xxxx"></label>
+    <label>Line ID <input id="driverLine" maxlength="50" autocomplete="off" autocapitalize="none"></label>
 
-    <label>รูปหรือเอกสารแนบ <small>(ไม่เกิน 5 ไฟล์ · รูป หรือ PDF ไม่เกิน 10 MB)</small>
+    <label>รายละเอียด <b>*</b>
+      <textarea id="detail" required rows="5" maxlength="2000" placeholder="เกิดอะไรขึ้น เมื่อไร ที่ไหน"></textarea>
+    </label>
+    <label>รูปหรือไฟล์แนบ <small>(เลือกเพิ่มได้หลายครั้ง ไม่เกิน 5 ไฟล์ · รูป หรือ PDF ไม่เกิน 10 MB)</small>
       <input id="files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf">
+    </label>
+    <ul id="fileList" class="file-list" hidden></ul>
+
+    <label>ชื่อผู้แจ้ง <b>*</b>
+      <input id="reporterName" required maxlength="100" autocomplete="name">
+    </label>
+    <label>เบอร์โทรผู้แจ้ง <b>*</b>
+      <input id="phone" required inputmode="tel" maxlength="15" autocomplete="tel" placeholder="08x-xxx-xxxx">
     </label>
 
     <label class="hp" aria-hidden="true">เว็บไซต์ <input id="website" tabindex="-1" autocomplete="off"></label>
@@ -71,7 +62,7 @@
     <h2>ส่งเรื่องเรียบร้อยแล้ว</h2>
     <p>เลขอ้างอิงของคุณ</p>
     <p id="ref" class="ref"></p>
-    <p>โปรดเก็บเลขนี้ไว้ เจ้าของอู่จะติดต่อกลับทางเบอร์ที่แจ้งไว้</p>
+    <p>โปรดเก็บเลขนี้ไว้เพื่อใช้อ้างอิง</p>
     <button id="again" type="button">แจ้งเรื่องอื่น</button>
   </section>
 </main>

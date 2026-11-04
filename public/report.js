@@ -19,20 +19,37 @@ function validThaiId(v) {
   return (11 - (sum % 11)) % 10 === +v[12];
 }
 
+// เก็บไฟล์ไว้เอง เพราะ input ล้างรายการเดิมทุกครั้งที่เลือกใหม่ (โดยเฉพาะบนมือถือ)
+let picked = [];
+function renderFiles() {
+  const box = $('fileList');
+  box.hidden = !picked.length;
+  box.replaceChildren(...picked.map((f, i) => {
+    const li = document.createElement('li'), span = document.createElement('span'), del = document.createElement('button');
+    span.textContent = f.name; del.type = 'button'; del.textContent = 'ลบ'; del.setAttribute('aria-label', 'ลบไฟล์ ' + f.name);
+    del.onclick = () => { picked.splice(i, 1); renderFiles(); };
+    li.append(span, del); return li;
+  }));
+}
+$('files').addEventListener('change', (e) => {
+  picked = picked.concat([...e.target.files]); e.target.value = ''; renderFiles();
+  if (picked.length > MAX_FILES) notice(`แนบไฟล์ได้ไม่เกิน ${MAX_FILES} ไฟล์ กรุณาลบออกบางไฟล์`); else notice('');
+});
+
 function validate() {
   if (!$('garage').value) return 'กรุณาเลือกอู่';
-  if ($('plate').value.trim().length < 2) return 'กรุณากรอกทะเบียนรถ';
-  if ($('detail').value.trim().length < 10) return 'กรุณาเล่ารายละเอียดอย่างน้อย 10 ตัวอักษร';
   if (!$('incidentDate').value) return 'กรุณาเลือกวันเกิดเหตุ';
   if ($('incidentDate').value > today()) return 'วันเกิดเหตุต้องไม่เกินวันนี้';
-  if ($('reporterName').value.trim().length < 2) return 'กรุณากรอกชื่อผู้แจ้งหรือชื่ออู่';
-  if (!/^0\d{8,9}$/.test($('phone').value.replace(/\D/g, ''))) return 'เบอร์โทรผู้แจ้งไม่ถูกต้อง';
   const nid = $('nid').value.replace(/\D/g, '');
   if (nid && !validThaiId(nid)) return 'เลขบัตรประชาชนไม่ถูกต้อง';
-  const files = [...$('files').files];
-  if (files.length > MAX_FILES) return `แนบไฟล์ได้ไม่เกิน ${MAX_FILES} ไฟล์`;
-  if (files.some((f) => !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(f.type))) return 'รองรับเฉพาะรูปและไฟล์ PDF';
-  if (files.some((f) => f.type === 'application/pdf' && f.size > MAX_BYTES)) return 'ไฟล์ PDF ต้องไม่เกิน 10 MB';
+  const drvPhone = $('driverPhone').value.replace(/\D/g, '');
+  if (drvPhone && !/^0\d{8,9}$/.test(drvPhone)) return 'เบอร์มือถือคนขับไม่ถูกต้อง';
+  if ($('detail').value.trim().length < 10) return 'กรุณาเล่ารายละเอียดอย่างน้อย 10 ตัวอักษร';
+  if (picked.length > MAX_FILES) return `แนบไฟล์ได้ไม่เกิน ${MAX_FILES} ไฟล์`;
+  if (picked.some((f) => !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(f.type))) return 'รองรับเฉพาะรูปและไฟล์ PDF';
+  if (picked.some((f) => f.type === 'application/pdf' && f.size > MAX_BYTES)) return 'ไฟล์ PDF ต้องไม่เกิน 10 MB';
+  if ($('reporterName').value.trim().length < 2) return 'กรุณากรอกชื่อผู้แจ้ง';
+  if (!/^0\d{8,9}$/.test($('phone').value.replace(/\D/g, ''))) return 'เบอร์โทรผู้แจ้งไม่ถูกต้อง';
   if (!$('consent').checked) return 'กรุณายอมรับเงื่อนไขการเก็บข้อมูล';
   return '';
 }
@@ -56,7 +73,7 @@ async function uploadFiles() {
   const batch = crypto.randomUUID();
   const out = [];
   let i = 0;
-  for (const original of $('files').files) {
+  for (const original of picked) {
     i++;
     let file;
     try { file = await shrinkImage(original); } catch { throw new Error('อ่านรูป ' + original.name + ' ไม่ได้'); }
@@ -91,15 +108,14 @@ $('form').addEventListener('submit', async (e) => {
     const files = await uploadFiles();
     const { data, error } = await sb.rpc('submit_complaint', {
       p_garage_id: $('garage').value,
-      p_reporter_type: document.querySelector('input[name=reporter]:checked').value,
-      p_reporter_name: $('reporterName').value,
-      p_reporter_last_name: $('reporterLastName').value,
       p_incident_date: $('incidentDate').value,
       p_driver_name: $('driverName').value,
       p_driver_code: $('driverCode').value,
       p_national_id: $('nid').value,
-      p_plate: $('plate').value,
+      p_driver_phone: $('driverPhone').value,
+      p_driver_line_id: $('driverLine').value,
       p_detail: $('detail').value,
+      p_reporter_name: $('reporterName').value,
       p_contact_phone: $('phone').value,
       p_consent: $('consent').checked,
       p_files: files,
@@ -118,7 +134,7 @@ $('form').addEventListener('submit', async (e) => {
 });
 
 $('again').addEventListener('click', () => {
-  $('form').reset();
+  $('form').reset(); picked = []; renderFiles();
   $('done').hidden = true; $('form').hidden = false;
 });
 
