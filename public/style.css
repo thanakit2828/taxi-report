@@ -36,3 +36,5 @@ main { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16
 input, select, textarea { font-size: 16px; }
 input[type=date] { -webkit-appearance: none; appearance: none; min-height: 48px; text-align: left; background: #fff; }
 input[type=date]::-webkit-date-and-time-value { text-align: left; }
+.embed .top { display: none; }
+.embed main { max-width: none; padding: 0; }
