@@ -1,6 +1,12 @@
 [build]
   publish = "."
 
+# ฟอร์มแจ้งเรื่องสำหรับลิงก์และ QR
+[[redirects]]
+  from = "/report"
+  to = "/report.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
