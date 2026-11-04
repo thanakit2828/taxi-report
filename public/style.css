@@ -30,3 +30,9 @@ button:disabled { opacity: .6; cursor: wait; }
 .file-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #f3f4f6; border-radius: 8px; padding: 6px 10px; font-size: .9rem; overflow-wrap: anywhere; }
 .file-list button { width: auto; min-height: 32px; padding: 0 10px; background: #fff; color: var(--red); border: 1px solid var(--line); font-weight: 500; flex: none; }
 .file-list button:hover { background: #fef2f2; }
+/* มือถือ: กันรอยบากและกันซูมอัตโนมัติของ iOS (ช่องกรอกต้องไม่ต่ำกว่า 16px) */
+.top { padding-top: max(20px, env(safe-area-inset-top)); }
+main { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+input, select, textarea { font-size: 16px; }
+input[type=date] { -webkit-appearance: none; appearance: none; min-height: 48px; text-align: left; background: #fff; }
+input[type=date]::-webkit-date-and-time-value { text-align: left; }
