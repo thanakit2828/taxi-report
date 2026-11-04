@@ -4,7 +4,7 @@
 .login-card h1 { margin: 0; color: var(--green-dark); font-size: 1.5rem; }
 .login-card p { margin: 4px 0 16px; color: var(--muted); }
 
-.bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; background: var(--green); color: #fff; padding: 8px 16px; }
+.bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; background: var(--green); color: #fff; padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); }
 .bar nav { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
 .bar button { width: auto; min-height: 36px; padding: 0 10px; background: transparent; color: #fff; font-weight: 500; }
 .bar button:hover, .bar button.on { background: var(--green-dark); }
@@ -105,3 +105,56 @@ dialog textarea { display: block; width: 100%; margin-top: 4px; padding: 11px; b
 .admin button.ico.del:hover { background: #fef2f2; color: #dc2626; }
 th.stick, td.stick { position: sticky; right: 0; background: #fff; box-shadow: -1px 0 0 #e5e7eb; }
 th.stick { background: #f0fdf4; }
+
+/* ── แท็บเล็ตและมือถือ ───────────────────────────── */
+html, body { overflow-x: clip; }
+@media (pointer: coarse) {
+  .admin button.ico { width: 40px; height: 40px; min-height: 40px; }
+  .actions button { min-height: 40px; }
+}
+@media (max-width: 1000px) {
+  /* หัวเมนู: ชื่อระบบ+บัญชีแถวบน เมนูเลื่อนซ้ายขวาแถวล่าง ไม่ติดค้างบนจอ */
+  .bar { position: static; justify-content: space-between; }
+  .bar nav { order: 3; flex: 1 0 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .bar nav::-webkit-scrollbar { display: none; }
+  .bar nav button { flex: none; white-space: nowrap; min-height: 40px; }
+
+  /* ตาราง → การ์ด */
+  #view .scroll { background: transparent; box-shadow: none; overflow: visible; }
+  #view table, #view tbody { display: block; }
+  #view thead { display: none; }
+  #view tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 10px; }
+  #view tbody tr { display: block; background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); padding: 8px 14px; }
+  #view tbody td { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 8px; padding: 6px 0; border: 0; white-space: normal; overflow-wrap: anywhere; max-width: none; text-overflow: clip; }
+  #view tbody td::before { content: attr(data-label); color: var(--muted); font-size: .85rem; }
+  #view tbody td[colspan] { display: block; }
+  #view tbody td[colspan]::before { content: none; }
+  #view td.clip { display: grid; }
+  #view td.stick { position: static; box-shadow: none; background: transparent; border-top: 1px solid #e5e7eb; margin-top: 6px; padding-top: 10px; align-items: center; }
+  #view td.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; border-top: 1px solid #e5e7eb; margin-top: 6px; padding-top: 10px; }
+  #view td.actions::before { content: none; }
+  table.click tbody tr:hover { background: #fff; }
+}
+@media (max-width: 640px) {
+  .bar { gap: 6px 8px; }
+  .bar > strong { flex: 1 0 100%; }
+  .who { flex: 1 0 100%; order: 4; }
+  #whoName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar .who button { min-height: 34px; padding: 0 8px; font-size: .85rem; }
+  main.wide { padding: 12px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat { padding: 10px 12px; }
+  .stat b { font-size: 1.5rem; }
+  .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filters > select, .filters > input { grid-column: 1 / -1; }
+  .inline { display: block; font-size: .85rem; white-space: normal; }
+  .inline input { width: 100%; margin-top: 2px !important; }
+  .panel { padding: 12px; }
+  .hbar { grid-template-columns: minmax(70px, 38%) 1fr 30px; }
+  dialog { width: 100vw; max-width: 100vw; max-height: 100dvh; height: 100dvh; margin: 0; border-radius: 0; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  dl { grid-template-columns: 6.5rem minmax(0, 1fr); }
+  .row.end { position: sticky; bottom: 0; background: #fff; padding: 10px 0 0; }
+  .row:not(.end) label { flex-basis: 100%; }
+}
+#qrBox { max-width: 100%; }
+#qrBox canvas { display: block; max-width: 100%; height: auto; }

@@ -446,6 +446,13 @@ $('view').addEventListener('mousemove', (e) => {
 });
 $('view').addEventListener('mouseleave', () => { $('chartTip').hidden = true; });
 let resizeT; addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => S.redraw?.(), 150); });
+// จอเล็กแสดงตารางเป็นการ์ด: คัดลอกหัวคอลัมน์ไปเป็นป้ายของแต่ละช่อง
+new MutationObserver(() => {
+  document.querySelectorAll('#view table').forEach((t) => {
+    const heads = [...t.querySelectorAll('thead th')].map((h) => h.textContent.trim());
+    t.querySelectorAll('tbody td:not([colspan]):not([data-label])').forEach((td) => { td.dataset.label = heads[td.cellIndex] || ''; });
+  });
+}).observe($('view'), { childList: true, subtree: true });
 $('view').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.dataset.open) openComplaint(e.target.dataset.open); });
 
 boot();
