@@ -1,5 +1,6 @@
 // ฟอร์มแจ้งเรื่อง — ตรวจข้อมูลฝั่งนี้เพื่อบอกผู้ใช้เร็วขึ้น ส่วนการตรวจจริงอยู่ที่ submit_complaint
 const $ = (id) => document.getElementById(id);
+if (new URLSearchParams(location.search).has('embed')) document.body.classList.add('embed');   // แสดงเต็มกว้างในหน้าจัดการ
 const MAX_FILES = 5, MAX_BYTES = 10 * 1024 * 1024, MAX_IMAGE_PX = 1600;
 const cfg = window.TR_CONFIG || {};
 const sb = cfg.url && cfg.key && window.supabase ? window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: false } }) : null;

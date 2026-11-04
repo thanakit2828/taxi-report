@@ -14,7 +14,8 @@ async function toEmail(u) {
   return 'u-' + [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32) + '@taxi-report.local';
 }
 
-const S = { me: null, isAdmin: false, tab: 'home', garages: [], complaints: [], users: [], filter: { garage: '', q: '', from: '', to: '', sort: 'desc' }, dash: null, redraw: null, viewing: null };
+const PAGE_SIZE = 10;
+const S = { me: null, isAdmin: false, tab: 'home', garages: [], complaints: [], users: [], filter: { garage: '', q: '', from: '', to: '', sort: 'desc', page: 1 }, dash: null, redraw: null, viewing: null };
 
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.hidden = false;
@@ -54,8 +55,8 @@ const canEdit = (c) => S.isAdmin || c.garage_id === S.me.garage_id;   // ฐา�
 const filterControls = (f) => `<select id="fGarage" aria-label="อู่"><option value="">ทุกอู่</option>${S.garages.map((g) => `<option value="${g.id}" ${f.garage === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>
   <input id="fQ" placeholder="ค้นหา ID เลขอ้างอิง ชื่อ นามสกุล เบอร์โทร" value="${esc(f.q)}" aria-label="ค้นหา">`;
 const readControls = (f) => { f.garage = $('fGarage').value; f.q = $('fQ').value.trim().toLowerCase(); };
-function complaintTable(list) {
-  return `<p class="muted">${list.length} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>ID</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
+function complaintTable(list, total) {
+  return `<p class="muted">${total} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>ID</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
     ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))}</td><td>${esc(c.contact_phone)}</td><td>${esc(c.driver_code || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${S.isAdmin ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">ไม่พบเรื่อง</td></tr>'}
   </tbody></table></div>`;
 }
@@ -176,8 +177,7 @@ const VIEWS = {
       <div class="charts">
         <section class="panel wide"><h3>จำนวนเรื่องตามเดือน <span class="muted">12 เดือนล่าสุด</span></h3><div id="cMonth"></div></section>
         <section class="panel wide"><h3>ตามอู่ <span class="muted">ในช่วงที่เลือก</span></h3><div id="cGarage"></div></section>
-      </div>
-      <h3>เรื่องในช่วงที่เลือก</h3><div id="cList"></div>`;
+      </div>`;
     const redraw = () => {
       readControls(f);
       const base = S.complaints.filter((c) => matchBase(c, f));
@@ -190,7 +190,6 @@ const VIEWS = {
       const months = Array.from({ length: 12 }, (_, i) => addMonths(ym, i - 11)).map((m) => ({ ym: m, n: base.filter((c) => bkk(c.created_at).slice(0, 7) === m).length }));
       monthChart($('cMonth'), months, f.from || '0000-00', f.to || '9999-99');
       $('cGarage').innerHTML = hBars(S.garages.map((g) => ({ label: g.name, n: list.filter((c) => c.garage_id === g.id).length })).filter((r) => r.n || !f.garage).sort((a, b) => b.n - a.n));
-      $('cList').innerHTML = complaintTable(list);
     };
     S.redraw = redraw;
     $('dStats').onclick = (e) => {
@@ -217,36 +216,42 @@ const VIEWS = {
       readControls(f); f.from = $('fFrom').value; f.to = $('fTo').value; f.sort = $('fSort').value;
       const list = S.complaints.filter((c) => matchBase(c, f) && inRange(c, f.from, f.to));
       if (f.sort === 'asc') list.reverse();
-      $('cList').innerHTML = complaintTable(list);
+      const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+      f.page = Math.min(f.page, pages);
+      const shown = list.slice((f.page - 1) * PAGE_SIZE, f.page * PAGE_SIZE);
+      $('cList').innerHTML = complaintTable(shown, list.length) + (pages > 1 ? `<nav class="pager" aria-label="เลือกหน้า"><button type="button" class="ghost" data-page="${f.page - 1}" ${f.page === 1 ? 'disabled' : ''}>ก่อนหน้า</button><span>หน้า ${f.page} / ${pages}</span><button type="button" class="ghost" data-page="${f.page + 1}" ${f.page === pages ? 'disabled' : ''}>ถัดไป</button></nav>` : '');
     };
     S.redraw = redraw;
-    ['fGarage', 'fFrom', 'fTo', 'fSort'].forEach((id) => { $(id).onchange = redraw; }); $('fQ').oninput = redraw;
+    const refilter = () => { f.page = 1; redraw(); };
+    ['fGarage', 'fFrom', 'fTo', 'fSort'].forEach((id) => { $(id).onchange = refilter; }); $('fQ').oninput = refilter;
+    $('cList').onclick = (e) => { const p = e.target.closest('[data-page]')?.dataset.page; if (p) { f.page = +p; redraw(); $('view').scrollIntoView(); } };
     redraw();
   },
 
-  // ── ฟอร์มร้องเรียน: ลิงก์และ QR ──
+  // ── ฟอร์มร้องเรียน: ฟอร์มเต็มจอ + ลิงก์/QR ขนาดเล็ก ──
   async link() {
-    $('view').innerHTML = `<h2>ฟอร์มร้องเรียน</h2>
-      <p class="muted">ลิงก์เดียวใช้ได้ทุกอู่ ผู้แจ้งเลือกอู่เองในฟอร์ม</p>
-      <div class="panel qr"><div id="qrBox"></div>
-        <div><p class="link-url" id="reportUrl"></p>
-          <div class="row"><button type="button" id="copyLink">คัดลอกลิงก์</button><a class="btn ghost" href="/report" target="_blank" rel="noopener">เปิดฟอร์ม</a><button type="button" id="dlQr" class="ghost">ดาวน์โหลด QR</button></div>
-        </div></div>`;
-    $('reportUrl').textContent = REPORT_URL;
+    $('view').innerHTML = `<div class="form-head"><h2>ฟอร์มร้องเรียน</h2>
+        <div class="qr-mini"><div id="qrBox"></div><div class="qr-text"><b>ลิงก์ฟอร์มร้องเรียน</b><span class="link-url" id="reportUrl"></span>
+          <div class="qr-btns"><button type="button" id="copyLink" class="small">คัดลอกลิงก์</button><button type="button" id="dlQr" class="ghost small">ดาวน์โหลด QR</button></div></div></div></div>
+      <iframe id="formFrame" class="form-frame" src="/report?embed=1" title="ฟอร์มร้องเรียน"></iframe>`;
+    $('reportUrl').textContent = REPORT_URL.replace(/^https?:\/\//, '');
     const qr = new window.QRCodeStyling({ width: 300, height: 300, type: 'canvas', data: REPORT_URL, margin: 8,
       dotsOptions: { type: 'rounded', color: '#15803d' }, cornersSquareOptions: { type: 'extra-rounded', color: '#166534' },
       cornersDotOptions: { type: 'dot', color: '#166534' }, backgroundOptions: { color: '#ffffff' }, qrOptions: { errorCorrectionLevel: 'Q' } });
     qr.append($('qrBox'));
     $('copyLink').onclick = async () => { await navigator.clipboard.writeText(REPORT_URL); toast('คัดลอกลิงก์แล้ว'); };
     $('dlQr').onclick = () => qr.download({ name: 'qr-แจ้งเรื่องแท็กซี่', extension: 'png' });
+    // ให้ความสูงกรอบเท่าฟอร์ม หน้าจะเลื่อนชั้นเดียว
+    const fr = $('formFrame');
+    fr.onload = () => { const doc = fr.contentDocument; if (!doc) return; const fit = () => { fr.style.height = doc.documentElement.scrollHeight + 'px'; }; fit(); new ResizeObserver(fit).observe(doc.body); };
   },
 
   // ── จัดการอู่ ──
   garages() {
     $('view').innerHTML = `<h2>จัดการอู่</h2>
       <div class="row panel"><button type="button" id="addGarage">เพิ่มอู่</button></div>
-      <div class="scroll"><table><thead><tr><th>รหัส</th><th>ชื่ออู่</th><th>ที่อยู่</th><th>เบอร์ติดต่อ</th><th>รายละเอียด</th><th>สถานะ</th><th></th></tr></thead><tbody>
-      ${S.garages.map((g) => `<tr><td>${esc(g.code || '-')}</td><td>${esc(g.name)}</td><td class="clip" title="${esc(g.address || '')}">${esc(g.address || '-')}</td><td>${esc(g.phone || '-')}</td><td class="clip" title="${esc(g.detail || '')}">${esc(g.detail || '-')}</td><td><span class="tag ${g.is_active ? 'closed' : 'off'}">${g.is_active ? 'เปิดรับเรื่อง' : 'ปิดรับเรื่อง'}</span></td>
+      <div class="scroll"><table><thead><tr><th>รหัส</th><th>ชื่ออู่</th><th>ที่อยู่</th><th>Contact Person</th><th>Contact Number</th><th>สถานะ</th><th></th></tr></thead><tbody>
+      ${S.garages.map((g) => `<tr><td>${esc(g.code || '-')}</td><td>${esc(g.name)}</td><td class="clip" title="${esc(g.address || '')}">${esc(g.address || '-')}</td><td>${esc(g.contact_person || '-')}</td><td>${esc(g.contact_number || '-')}</td><td><span class="tag ${g.is_active ? 'closed' : 'off'}">${g.is_active ? 'เปิดรับเรื่อง' : 'ปิดรับเรื่อง'}</span></td>
         <td class="actions"><button type="button" class="ghost" data-grename="${g.id}">แก้ไข</button><button type="button" class="ghost" data-gtoggle="${g.id}">${g.is_active ? 'ปิดรับเรื่อง' : 'เปิดรับเรื่อง'}</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">ยังไม่มีอู่</td></tr>'}
       </tbody></table></div>`;
     $('addGarage').onclick = () => openGarageForm();
@@ -312,7 +317,7 @@ async function openComplaint(id) {
       ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', esc(gName(c.garage_id)))}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
       ${row('ผู้แจ้ง', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ')))}${row('เบอร์โทรผู้แจ้ง', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`)}
       ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('รหัสคนขับ', esc(c.driver_code || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
-      ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">*********${esc(c.national_id_last4)}</span>${mine ? ' <button type="button" class="ghost small" id="revealBtn">แสดงเลขเต็ม</button>' : ''}` : '-')}
+      ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">กำลังโหลด…</span>` : '-')}
     </dl>
     <h3>รายละเอียด</h3><p class="prewrap">${esc(c.detail)}</p>
     <h3>ไฟล์แนบ</h3>${links.length ? `<ul>${links.join('')}</ul>` : '<p class="muted">ไม่มีไฟล์แนบ</p>'}
@@ -323,12 +328,10 @@ async function openComplaint(id) {
     <div class="row end"><button type="button" id="dClose" class="ghost">ปิด</button></div>`;
   $('dlg').showModal();
   $('dClose').onclick = () => $('dlg').close();
-  if ($('revealBtn')) $('revealBtn').onclick = async () => {
-    if (!confirm('การเปิดดูเลขบัตรเต็มจะถูกบันทึกในประวัติ ต้องการดำเนินการต่อหรือไม่?')) return;
+  if ($('nidVal')) {   // เปิดเลขเต็มอัตโนมัติ ฐานข้อมูลบันทึกประวัติการเปิดดูทุกครั้ง
     const { data, error } = await sb.rpc('reveal_national_id', { p_complaint_id: id });
-    if (error) return toast(errMsg(error));
-    $('nidVal').textContent = data || '-'; $('revealBtn').remove();
-  };
+    if (S.viewing === id && $('nidVal')) $('nidVal').textContent = error ? '*********' + c.national_id_last4 : (data || '-');
+  }
   if ($('dNote')) {
     $('dNote').value = c.garage_note || '';
     $('dNoteSave').onclick = async () => {
@@ -377,15 +380,15 @@ function openGarageForm(g) {
     <label>ชื่ออู่ <input id="gName" required maxlength="100" autocomplete="off"></label>
     <label>รหัสอู่ <small>(อังกฤษ/ตัวเลข 2–6 ตัว ใช้ขึ้นต้นเลขอ้างอิง เช่น TN)</small> <input id="gCode" required minlength="2" maxlength="6" pattern="[A-Za-z0-9]{2,6}" autocomplete="off" autocapitalize="characters"></label>
     <label>ที่อยู่ <textarea id="gAddress" rows="2" maxlength="500"></textarea></label>
-    <label>เบอร์ติดต่อ <input id="gPhone" inputmode="tel" maxlength="30" autocomplete="off"></label>
-    <label>รายละเอียดอู่ <textarea id="gDetail" rows="3" maxlength="1000"></textarea></label>
+    <label>Contact Person <input id="gPerson" maxlength="100" autocomplete="off"></label>
+    <label>Contact Number <input id="gNumber" inputmode="tel" maxlength="30" autocomplete="off"></label>
     <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">บันทึก</button></div></form>`;
-  $('gName').value = g?.name || ''; $('gCode').value = g?.code || ''; $('gAddress').value = g?.address || ''; $('gPhone').value = g?.phone || ''; $('gDetail').value = g?.detail || '';
+  $('gName').value = g?.name || ''; $('gCode').value = g?.code || ''; $('gAddress').value = g?.address || ''; $('gPerson').value = g?.contact_person || ''; $('gNumber').value = g?.contact_number || '';
   $('dlg').showModal();
   $('dCancel').onclick = () => $('dlg').close();
   $('dForm').onsubmit = async (e) => {
     e.preventDefault();
-    const row = { name: $('gName').value.trim(), code: $('gCode').value.trim().toUpperCase(), address: $('gAddress').value.trim() || null, phone: $('gPhone').value.trim() || null, detail: $('gDetail').value.trim() || null };
+    const row = { name: $('gName').value.trim(), code: $('gCode').value.trim().toUpperCase(), address: $('gAddress').value.trim() || null, contact_person: $('gPerson').value.trim() || null, contact_number: $('gNumber').value.trim() || null };
     if (!row.name) return toast('กรุณากรอกชื่ออู่');
     const { error } = g ? await sb.from('garages').update(row).eq('id', g.id) : await sb.from('garages').insert(row);
     if (error) return toast(error.code === '23505' ? 'ชื่อหรือรหัสอู่นี้มีอยู่แล้ว' : errMsg(error));
