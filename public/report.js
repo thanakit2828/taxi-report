@@ -120,7 +120,7 @@ $('form').addEventListener('submit', async (e) => {
       p_garage_id: $('garage').value,
       p_incident_date: $('incidentDate').value,
       p_driver_name: $('driverName').value,
-      p_driver_code: $('driverCode').value,
+      p_driver_code: null,
       p_national_id: $('nid').value,
       p_driver_phone: $('driverPhone').value,
       p_driver_line_id: $('driverLine').value,

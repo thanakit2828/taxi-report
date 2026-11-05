@@ -39,7 +39,7 @@ function presetRange(p) {
 function matchBase(c, f) {
   if (f.garage && c.garage_id !== f.garage) return false;
   if (!f.q) return true;
-  const text = [c.ref_no, c.reporter_name, c.reporter_last_name, c.driver_code, c.contact_phone, c.driver_name, c.driver_phone, c.driver_line_id, c.plate].join(' ').toLowerCase();
+  const text = [c.ref_no, c.reporter_name, c.reporter_last_name, c.contact_phone, c.driver_name, c.driver_phone, c.driver_line_id, c.plate].join(' ').toLowerCase();
   const digits = /^[\d\s-]+$/.test(f.q) ? f.q.replace(/\D/g, '') : '';
   return text.includes(f.q) || (digits && [c.contact_phone, c.driver_phone].some((v) => (v || '').includes(digits)));
 }
@@ -51,12 +51,12 @@ const ICON = {
   del: svg('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>'),
 };
 const canEdit = (c) => S.isAdmin || c.garage_id === S.me.garage_id;   // ฐานข้อมูลบังคับสิทธิ์ซ้ำอีกชั้น
-const filterControls = (f) => `<select id="fGarage" aria-label="อู่"><option value="">ทุกอู่</option>${S.garages.map((g) => `<option value="${g.id}" ${f.garage === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>
-  <input id="fQ" placeholder="ค้นหา ID เลขอ้างอิง ชื่อ นามสกุล เบอร์โทร" value="${esc(f.q)}" aria-label="ค้นหา">`;
+const filterControls = (f) => `<select id="fGarage" aria-label="อู่"><option value="">ทุกอู่</option>${S.garages.map((g) => `<option value="${g.id}" ${f.garage === g.id ? 'selected' : ''}>${esc(g.name)}${g.code ? ` ( ${esc(g.code)} )` : ''}</option>`).join('')}</select>
+  <input id="fQ" placeholder="ค้นหา เลขอ้างอิง ชื่อ นามสกุล เบอร์โทร" value="${esc(f.q)}" aria-label="ค้นหา">`;
 const readControls = (f) => { f.garage = $('fGarage').value; f.q = $('fQ').value.trim().toLowerCase(); };
 function complaintTable(list, total) {
-  return `<p class="muted">${total} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>ID</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
-    ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ') || c.driver_name || '-')}</td><td>${esc(c.contact_phone || c.driver_phone || '-')}</td><td>${esc(c.driver_code || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${canEdit(c) ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">ไม่พบเรื่อง</td></tr>'}
+  return `<p class="muted">${total} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
+    ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ') || c.driver_name || '-')}</td><td>${esc(c.contact_phone || c.driver_phone || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${canEdit(c) ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="8" class="muted">ไม่พบเรื่อง</td></tr>'}
   </tbody></table></div>`;
 }
 
@@ -309,7 +309,7 @@ async function openComplaint(id) {
     <dl class="detail">
       ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', esc(gName(c.garage_id)))}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
       ${c.reporter_name ? row('ผู้แจ้ง', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))) : ''}${c.contact_phone ? row('เบอร์โทรผู้แจ้ง', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`) : ''}
-      ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('รหัสคนขับ', esc(c.driver_code || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
+      ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
       ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">กำลังโหลด…</span>` : '-')}
     </dl>
     <h3>รายละเอียด</h3><p class="prewrap">${esc(c.detail)}</p>
@@ -338,18 +338,18 @@ async function openComplaint(id) {
 function openComplaintEdit(c) {
   $('dlgBody').innerHTML = `<h2>แก้ไขเรื่อง ${esc(c.ref_no)}</h2><form id="dForm">
     <div class="grid"><label>วันเกิดเหตุ <input id="eDate" type="date" max="${bkk()}"></label><label>ชื่อคนขับ <input id="eDrv" maxlength="100"></label>
-    <label>ID (รหัสคนขับ) <input id="eCode" maxlength="30"></label><label>มือถือคนขับ <input id="eDrvPhone" inputmode="tel" maxlength="15"></label>
+    <label>มือถือคนขับ <input id="eDrvPhone" inputmode="tel" maxlength="15"></label>
     <label>Line ID <input id="eLine" maxlength="50" autocapitalize="none"></label><label>สถานะ <select id="eStatus">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
     <label>รายละเอียด <textarea id="eDetail" rows="5" required maxlength="2000"></textarea></label>
     <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">บันทึก</button></div></form>`;
-  $('eDate').value = c.incident_date || ''; $('eDrv').value = c.driver_name || ''; $('eCode').value = c.driver_code || '';
+  $('eDate').value = c.incident_date || ''; $('eDrv').value = c.driver_name || '';
   $('eDrvPhone').value = c.driver_phone || ''; $('eLine').value = c.driver_line_id || ''; $('eStatus').value = c.status; $('eDetail').value = c.detail;
   $('dlg').showModal();
   $('dCancel').onclick = () => $('dlg').close();
   $('dForm').onsubmit = async (e) => {
     e.preventDefault();
     const { error } = await sb.rpc('update_complaint', { p_complaint_id: c.id, p_incident_date: $('eDate').value || null,
-      p_driver_name: $('eDrv').value, p_driver_code: $('eCode').value, p_driver_phone: $('eDrvPhone').value, p_driver_line_id: $('eLine').value, p_detail: $('eDetail').value, p_status: $('eStatus').value });
+      p_driver_name: $('eDrv').value, p_driver_code: c.driver_code, p_driver_phone: $('eDrvPhone').value, p_driver_line_id: $('eLine').value, p_detail: $('eDetail').value, p_status: $('eStatus').value });
     if (error) return toast(errMsg(error));
     $('dlg').close(); toast('แก้ไขแล้ว'); await refreshList();
   };
@@ -389,7 +389,7 @@ function openUserForm(garageId) {
 function openGarageForm(g) {
   $('dlgBody').innerHTML = `<h2>${g ? 'แก้ไขอู่' : 'เพิ่มอู่'}</h2><form id="dForm">
     <label>ชื่ออู่ <input id="gName" required maxlength="100" autocomplete="off"></label>
-    <label>รหัสอู่ <small>(อังกฤษ/ตัวเลข 2–6 ตัว ใช้ขึ้นต้นเลขอ้างอิง เช่น TN)</small> <input id="gCode" required minlength="2" maxlength="6" pattern="[A-Za-z0-9]{2,6}" autocomplete="off" autocapitalize="characters"></label>
+    ${g ? `<p class="muted">รหัสอู่ ${esc(g.code || '-')}</p>` : '<p class="muted">รหัสอู่ระบบออกให้อัตโนมัติ เช่น A1, A2</p>'}
     <label>ที่อยู่ <textarea id="gAddress" rows="2" maxlength="500"></textarea></label>
     <label>Contact Person <input id="gPerson" maxlength="100" autocomplete="off"></label>
     <label>Contact Number <input id="gNumber" inputmode="tel" maxlength="30" autocomplete="off"></label>
@@ -397,16 +397,16 @@ function openGarageForm(g) {
     <label>ชื่อผู้ใช้ <input id="gUser" required minlength="2" maxlength="50" autocomplete="off" autocapitalize="none" placeholder="ตั้งชื่ออะไรก็ได้"></label>
     <label>รหัสผ่าน <input id="gPass" type="text" required minlength="8" maxlength="72" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร"></label>`}
     <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">บันทึก</button></div></form>`;
-  $('gName').value = g?.name || ''; $('gCode').value = g?.code || ''; $('gAddress').value = g?.address || ''; $('gPerson').value = g?.contact_person || ''; $('gNumber').value = g?.contact_number || '';
+  $('gName').value = g?.name || ''; $('gAddress').value = g?.address || ''; $('gPerson').value = g?.contact_person || ''; $('gNumber').value = g?.contact_number || '';
   $('dlg').showModal();
   $('dCancel').onclick = () => $('dlg').close();
   $('dForm').onsubmit = async (e) => {
     e.preventDefault();
-    const row = { name: $('gName').value.trim(), code: $('gCode').value.trim().toUpperCase(), address: $('gAddress').value.trim() || null, contact_person: $('gPerson').value.trim() || null, contact_number: $('gNumber').value.trim() || null };
+    const row = { name: $('gName').value.trim(), address: $('gAddress').value.trim() || null, contact_person: $('gPerson').value.trim() || null, contact_number: $('gNumber').value.trim() || null };
     if (!row.name) return toast('กรุณากรอกชื่ออู่');
     const { error } = g ? await sb.from('garages').update(row).eq('id', g.id)
-      : await sb.rpc('admin_create_garage', { p_name: row.name, p_code: row.code, p_address: row.address, p_contact_person: row.contact_person, p_contact_number: row.contact_number, p_username: $('gUser').value, p_password: $('gPass').value });
-    if (error) return toast(error.code === '23505' ? 'ชื่อหรือรหัสอู่นี้มีอยู่แล้ว' : errMsg(error));
+      : await sb.rpc('admin_create_garage', { p_name: row.name, p_address: row.address, p_contact_person: row.contact_person, p_contact_number: row.contact_number, p_username: $('gUser').value, p_password: $('gPass').value });
+    if (error) return toast(error.code === '23505' ? 'ชื่ออู่นี้มีอยู่แล้ว' : errMsg(error));
     $('dlg').close(); toast(g ? 'แก้ไขอู่แล้ว' : 'เพิ่มอู่และบัญชีผู้ใช้แล้ว'); go('garages');
   };
 }
