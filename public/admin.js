@@ -49,20 +49,26 @@ function matchBase(c, f) {
   if (!f.q) return true;
   const text = [c.ref_no, c.reporter_name, c.reporter_last_name, c.contact_phone, c.driver_name, c.driver_phone, c.driver_line_id, c.plate, c.national_id_last4, c.detail, ...dateForms(c.incident_date), ...dateForms(bkk(c.created_at))].join(' ').toLowerCase();
   const digits = /^[\d\s-]+$/.test(f.q) ? f.q.replace(/\D/g, '') : '';
-  if (digits.length === 13) return nidHit.q === digits && nidHit.ids.has(c.id);
+  if (digits && nidHit.q === digits && nidHit.ids.has(c.id)) return true;
   return text.includes(f.q) || (digits && [c.contact_phone, c.driver_phone].some((v) => (v || '').includes(digits)));
 }
-// พิมพ์เลขบัตรครบ 13 หลักจึงถามฐานข้อมูล เพราะหน้าเว็บมีแค่ 4 ตัวท้าย
+// เลขบัตรเต็มอยู่ที่ฐานข้อมูลเท่านั้น จึงถามตามตัวเลขที่พิมพ์ รอหยุดพิมพ์สักครู่เพื่อไม่ให้ถามทุกตัวอักษร
+const qDigits = () => (/^[\d\s-]+$/.test($('fQ').value) ? $('fQ').value.replace(/\D/g, '') : '');
+let nidTimer;
 function bindSearch(redraw) {
-  $('fQ').oninput = async () => {
-    const digits = /^[\d\s-]+$/.test($('fQ').value) ? $('fQ').value.replace(/\D/g, '') : '';
-    if (digits.length === 13 && nidHit.q !== digits) {
+  $('fQ').oninput = () => {
+    redraw();
+    clearTimeout(nidTimer);
+    const digits = qDigits();
+    if (!digits || digits.length > 13 || nidHit.q === digits) return;
+    nidTimer = setTimeout(async () => {
       const { data, error } = await sb.rpc('find_complaints_by_nid', { p_nid: digits });
       if (error) return toast(errMsg(error));
+      if (!$('fQ') || qDigits() !== digits) return;   // พิมพ์ต่อหรือเปลี่ยนหน้าไปแล้ว
       // ฐานข้อมูลส่งกลับได้ทั้งเป็นค่าเดี่ยวและเป็นแถว
       nidHit.q = digits; nidHit.ids = new Set((data || []).map((x) => (typeof x === 'string' ? x : Object.values(x)[0])));
-    }
-    redraw();
+      redraw();
+    }, 250);
   };
 }
 const inRange = (c, from, to) => { const d = bkk(c.created_at); return (!from || d >= from) && (!to || d <= to); };
@@ -335,7 +341,7 @@ async function openComplaint(id) {
   const mine = S.isAdmin || c.is_mine;   // เรื่องของอู่อื่น = ดูอย่างเดียว (ฐานข้อมูลก็บังคับเช่นกัน)
   $('dlgBody').innerHTML = `<h2>เรื่อง ${esc(c.ref_no)}</h2>
     <dl class="detail">
-      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${S.isAdmin ? row('อู่', esc(gName(c.garage_id))) : ''}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
+      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', mine ? esc(gName(c.garage_id)) : '<span id="garageVal">กำลังโหลด…</span>')}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
       ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
       ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">กำลังโหลด…</span>` : '-')}
     </dl>
@@ -349,6 +355,9 @@ async function openComplaint(id) {
     <div class="row end"><button type="button" id="dClose" class="ghost">ปิด</button></div>`;
   $('dlg').showModal();
   $('dClose').onclick = () => $('dlg').close();
+  if ($('garageVal')) {   // เรื่องของอู่อื่น รายการรวมไม่มีชื่ออู่ จึงถามตอนเปิดดู
+    sb.rpc('complaint_garage_name', { p_complaint_id: id }).then(({ data, error }) => { if (S.viewing === id && $('garageVal')) $('garageVal').textContent = error ? '-' : (data || '-'); });
+  }
   if ($('nidVal')) {   // เปิดเลขเต็มอัตโนมัติ ฐานข้อมูลบันทึกประวัติการเปิดดูทุกครั้ง
     const { data, error } = await sb.rpc('reveal_national_id', { p_complaint_id: id });
     if (S.viewing === id && $('nidVal')) $('nidVal').textContent = error ? '*********' + c.national_id_last4 : (data || '-');
@@ -416,14 +425,14 @@ function openUserForm(garageId) {
 
 function openGarageForm(g) {
   $('dlgBody').innerHTML = `<h2>${g ? 'แก้ไขอู่' : 'เพิ่มอู่'}</h2><form id="dForm">
-    <label>ชื่ออู่ <input id="gName" required maxlength="100" autocomplete="off"></label>
+    <label>ชื่ออู่ <b>*</b> <input id="gName" required maxlength="100" autocomplete="off"></label>
     ${g ? `<p class="muted">รหัสอู่ ${esc(g.code || '-')}</p>` : '<p class="muted">รหัสอู่ระบบออกให้อัตโนมัติ เช่น A1, A2</p>'}
-    <label>ที่อยู่ <textarea id="gAddress" rows="2" maxlength="500"></textarea></label>
-    <label>Contact Person <input id="gPerson" maxlength="100" autocomplete="off"></label>
-    <label>Contact Number <input id="gNumber" inputmode="tel" maxlength="30" autocomplete="off"></label>
+    <label>ที่อยู่ <b>*</b> <textarea id="gAddress" rows="2" required maxlength="500"></textarea></label>
+    <label>Contact Person <b>*</b> <input id="gPerson" required maxlength="100" autocomplete="off"></label>
+    <label>Contact Number <b>*</b> <input id="gNumber" required inputmode="tel" maxlength="30" autocomplete="off"></label>
     ${g ? '' : `<h3>บัญชีเข้าใช้งานของอู่</h3>
-    <label>ชื่อผู้ใช้ <input id="gUser" required minlength="2" maxlength="50" autocomplete="off" autocapitalize="none" placeholder="ตั้งชื่ออะไรก็ได้"></label>
-    <label>รหัสผ่าน <input id="gPass" type="text" required minlength="8" maxlength="72" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร"></label>`}
+    <label>ชื่อผู้ใช้ <b>*</b> <input id="gUser" required minlength="2" maxlength="50" autocomplete="off" autocapitalize="none" placeholder="ตั้งชื่ออะไรก็ได้"></label>
+    <label>รหัสผ่าน <b>*</b> <input id="gPass" type="text" required minlength="8" maxlength="72" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร"></label>`}
     <div class="row end"><button type="button" id="dCancel" class="ghost">ยกเลิก</button><button type="submit">บันทึก</button></div></form>`;
   $('gName').value = g?.name || ''; $('gAddress').value = g?.address || ''; $('gPerson').value = g?.contact_person || ''; $('gNumber').value = g?.contact_number || '';
   $('dlg').showModal();
@@ -431,7 +440,7 @@ function openGarageForm(g) {
   $('dForm').onsubmit = async (e) => {
     e.preventDefault();
     const row = { name: $('gName').value.trim(), address: $('gAddress').value.trim() || null, contact_person: $('gPerson').value.trim() || null, contact_number: $('gNumber').value.trim() || null };
-    if (!row.name) return toast('กรุณากรอกชื่ออู่');
+    if (!row.name || !row.address || !row.contact_person || !row.contact_number) return toast('กรุณากรอกข้อมูลอู่ให้ครบทุกช่อง');
     const { error } = g ? await sb.from('garages').update(row).eq('id', g.id)
       : await sb.rpc('admin_create_garage', { p_name: row.name, p_address: row.address, p_contact_person: row.contact_person, p_contact_number: row.contact_number, p_username: $('gUser').value, p_password: $('gPass').value });
     if (error) return toast(error.code === '23505' ? 'ชื่ออู่นี้มีอยู่แล้ว' : errMsg(error));
