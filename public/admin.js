@@ -341,12 +341,12 @@ async function openComplaint(id) {
   const mine = S.isAdmin || c.is_mine;   // เรื่องของอู่อื่น = ดูอย่างเดียว (ฐานข้อมูลก็บังคับเช่นกัน)
   $('dlgBody').innerHTML = `<h2>เรื่อง ${esc(c.ref_no)}</h2>
     <dl class="detail">
-      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', mine ? esc(gName(c.garage_id)) : '<span id="garageVal">กำลังโหลด…</span>')}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
+      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', '<span id="garageVal">กำลังโหลด…</span>')}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
       ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
       ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">กำลังโหลด…</span>` : '-')}
     </dl>
     <h3>รายละเอียด</h3><p class="prewrap">${esc(c.detail)}</p>
-    ${c.reporter_name || c.contact_phone ? `<dl class="detail">${c.reporter_name ? row('ผู้ร้องเรียน', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))) : ''}${c.contact_phone ? row('เบอร์โทรผู้ร้องเรียน', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`) : ''}</dl>` : ''}
+    <dl class="detail">${row('ผู้ร้องเรียน', '<span id="repName">กำลังโหลด…</span>')}${row('เบอร์โทรผู้ร้องเรียน', '<span id="repPhone">กำลังโหลด…</span>')}</dl>
     <h3>ไฟล์แนบ</h3>${links.length ? `<ul>${links.join('')}</ul>` : '<p class="muted">ไม่มีไฟล์แนบ</p>'}
     <p>สถานะ <span class="tag ${c.status}">${STATUS[c.status]}</span>${mine ? '' : ' <span class="muted">เรื่องของอู่อื่น ดูได้อย่างเดียว</span>'}</p>
     <h3>หมายเหตุของอู่</h3>
@@ -355,9 +355,14 @@ async function openComplaint(id) {
     <div class="row end"><button type="button" id="dClose" class="ghost">ปิด</button></div>`;
   $('dlg').showModal();
   $('dClose').onclick = () => $('dlg').close();
-  if ($('garageVal')) {   // เรื่องของอู่อื่น รายการรวมไม่มีชื่ออู่ จึงถามตอนเปิดดู
-    sb.rpc('complaint_garage_name', { p_complaint_id: id }).then(({ data, error }) => { if (S.viewing === id && $('garageVal')) $('garageVal').textContent = error ? '-' : (data || '-'); });
-  }
+  // รายการรวมไม่มีข้อมูลอู่และผู้ร้องเรียนของอู่อื่น จึงถามตอนเปิดดู
+  sb.rpc('complaint_view_info', { p_complaint_id: id }).then(({ data, error }) => {
+    if (S.viewing !== id || !$('garageVal')) return;
+    const v = (!error && data && data[0]) || {};
+    $('garageVal').textContent = v.garage_name || '-';
+    $('repName').textContent = v.reporter_name || '-';
+    if (v.contact_phone) { const a = document.createElement('a'); a.href = 'tel:' + v.contact_phone; a.textContent = v.contact_phone; $('repPhone').replaceChildren(a); } else $('repPhone').textContent = '-';
+  });
   if ($('nidVal')) {   // เปิดเลขเต็มอัตโนมัติ ฐานข้อมูลบันทึกประวัติการเปิดดูทุกครั้ง
     const { data, error } = await sb.rpc('reveal_national_id', { p_complaint_id: id });
     if (S.viewing === id && $('nidVal')) $('nidVal').textContent = error ? '*********' + c.national_id_last4 : (data || '-');

@@ -44,8 +44,6 @@ function validate() {
   const nid = $('nid').value.replace(/\D/g, '');
   if (!nid) return 'กรุณากรอกเลขบัตรประชาชนคนขับ';
   if (!validThaiId(nid)) return 'เลขบัตรประชาชนไม่ถูกต้อง';
-  const repPhone = $('reporterPhone').value.replace(/\D/g, '');
-  if (repPhone && !/^0\d{8,9}$/.test(repPhone)) return 'เบอร์โทรผู้ร้องเรียนไม่ถูกต้อง';
   const drvPhone = $('driverPhone').value.replace(/\D/g, '');
   if (drvPhone && !/^0\d{8,9}$/.test(drvPhone)) return 'เบอร์มือถือคนขับไม่ถูกต้อง';
   if ($('detail').value.trim().length < 10) return 'กรุณาเล่ารายละเอียดอย่างน้อย 10 ตัวอักษร';
@@ -128,8 +126,8 @@ $('form').addEventListener('submit', async (e) => {
       p_driver_phone: $('driverPhone').value,
       p_driver_line_id: $('driverLine').value,
       p_detail: $('detail').value,
-      p_reporter_name: $('reporterName').value,
-      p_reporter_phone: $('reporterPhone').value,
+      p_reporter_name: null,   // ฐานข้อมูลใช้ Contact Person/Number ของอู่
+      p_reporter_phone: null,
       p_files: files,
     });
     if (error) throw new Error(error.code === 'P0001' ? error.message : 'ส่งเรื่องไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
