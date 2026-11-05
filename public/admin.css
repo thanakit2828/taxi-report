@@ -172,6 +172,3 @@ html, body { overflow-x: clip; }
 .form-frame { display: block; width: 100%; min-height: 70vh; border: 0; border-radius: 12px; background: transparent; }
 #view > h3.sec { margin: 22px 0 10px; }
 #view > .row.panel { padding: 10px 14px; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 6px; font-size: .85rem; color: var(--text); }
-.lg { display: inline-flex; align-items: center; }
-.swatch { display: inline-flex; margin-right: 6px; flex: none; }

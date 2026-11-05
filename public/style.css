@@ -6,7 +6,7 @@ body { margin: 0; background: #f3f4f6; color: var(--text); font: 16px/1.5 "Inter
 .top p { margin: 4px 0 0; font-size: .9rem; }
 main { max-width: 560px; margin: 0 auto; padding: 16px; }
 form, #done { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
-form[hidden], #done[hidden] { display: none; }
+form[hidden], #done[hidden], label[hidden] { display: none; }
 label { display: block; margin-bottom: 14px; font-weight: 600; }
 label b, legend b { color: var(--red); }
 small { font-weight: 400; color: var(--muted); }

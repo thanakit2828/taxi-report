@@ -4,7 +4,7 @@ const sb = window.supabase.createClient(window.TR_CONFIG.url, window.TR_CONFIG.k
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (d) => (d ? new Date(d).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short' }) : '-');
 const STATUS = { new: 'ใหม่', in_progress: 'กำลังดำเนินการ', closed: 'ปิดเรื่อง' };
-const AUDIT = { reveal_national_id: 'เปิดดูเลขบัตร', move_complaint: 'ย้ายอู่', set_status: 'เปลี่ยนสถานะ', edit_complaint: 'แก้ไขเรื่อง', set_note: 'บันทึกหมายเหตุ', delete_complaint: 'ลบเรื่อง', create_user: 'สร้างผู้ใช้', set_password: 'ตั้งรหัสผ่าน', enable_user: 'เปิดบัญชี', disable_user: 'ปิดบัญชี' };
+const AUDIT = { submit_complaint: 'แจ้งเรื่องใหม่', search_national_id: 'ค้นหาจากเลขบัตร', reveal_national_id: 'เปิดดูเลขบัตร', move_complaint: 'ย้ายอู่', set_status: 'เปลี่ยนสถานะ', edit_complaint: 'แก้ไขเรื่อง', set_note: 'บันทึกหมายเหตุ', delete_complaint: 'ลบเรื่อง', create_user: 'สร้างผู้ใช้', set_password: 'ตั้งรหัสผ่าน', enable_user: 'เปิดบัญชี', disable_user: 'ปิดบัญชี' };
 // ตรงกับ private.login_email ในฐานข้อมูล: ชื่อรูปแบบเดิมใช้ตรงๆ ชื่ออื่น (ไทย/เว้นวรรค) ใช้ hash
 async function toEmail(u) {
   const v = u.trim().toLowerCase().normalize('NFC');
@@ -36,12 +36,32 @@ function presetRange(p) {
   return [ym + '-01', t];
 }
 // ใช้กรองร่วมกันทั้งหน้าภาพรวมและหน้าเรื่องร้องเรียน
+const nidHit = { q: '', ids: new Set() };   // ผลค้นเลขบัตรเต็มจากฐานข้อมูล
+const pad2 = (n) => String(n).padStart(2, '0');
+// วันที่หลายรูปแบบ เช่น 2026-11-05, 5/11/2026, 05/11/2569, 5 พ.ย. 2569
+function dateForms(iso) {
+  if (!iso) return [];
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return [iso.slice(0, 10), fmtDate(iso.slice(0, 10)), ...[y, y + 543].flatMap((yy) => [`${d}/${m}/${yy}`, `${pad2(d)}/${pad2(m)}/${yy}`, `${d}-${m}-${yy}`, `${pad2(d)}-${pad2(m)}-${yy}`])];
+}
 function matchBase(c, f) {
-  if (f.garage && c.garage_id !== f.garage) return false;
+  if (f.garage === 'mine' ? !c.is_mine : f.garage && c.garage_id !== f.garage) return false;
   if (!f.q) return true;
-  const text = [c.ref_no, c.reporter_name, c.reporter_last_name, c.contact_phone, c.driver_name, c.driver_phone, c.driver_line_id, c.plate].join(' ').toLowerCase();
+  const text = [c.ref_no, c.reporter_name, c.reporter_last_name, c.contact_phone, c.driver_name, c.driver_phone, c.driver_line_id, c.plate, c.national_id_last4, c.detail, ...dateForms(c.incident_date), ...dateForms(bkk(c.created_at))].join(' ').toLowerCase();
   const digits = /^[\d\s-]+$/.test(f.q) ? f.q.replace(/\D/g, '') : '';
+  if (digits.length === 13) return nidHit.q === digits && nidHit.ids.has(c.id);
   return text.includes(f.q) || (digits && [c.contact_phone, c.driver_phone].some((v) => (v || '').includes(digits)));
+}
+// พิมพ์เลขบัตรครบ 13 หลักจึงถามฐานข้อมูล เพราะหน้าเว็บมีแค่ 4 ตัวท้าย
+function bindSearch(redraw) {
+  $('fQ').oninput = async () => {
+    const digits = /^[\d\s-]+$/.test($('fQ').value) ? $('fQ').value.replace(/\D/g, '') : '';
+    if (digits.length === 13 && nidHit.q !== digits) {
+      const { data } = await sb.rpc('find_complaints_by_nid', { p_nid: digits });
+      nidHit.q = digits; nidHit.ids = new Set(data || []);
+    }
+    redraw();
+  };
 }
 const inRange = (c, from, to) => { const d = bkk(c.created_at); return (!from || d >= from) && (!to || d <= to); };
 const svg = (d) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -50,67 +70,75 @@ const ICON = {
   edit: svg('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>'),
   del: svg('<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>'),
 };
-const canEdit = (c) => S.isAdmin || c.garage_id === S.me.garage_id;   // ฐานข้อมูลบังคับสิทธิ์ซ้ำอีกชั้น
-const filterControls = (f) => `<select id="fGarage" aria-label="อู่"><option value="">ทุกอู่</option>${S.garages.map((g) => `<option value="${g.id}" ${f.garage === g.id ? 'selected' : ''}>${esc(g.name)}${g.code ? ` ( ${esc(g.code)} )` : ''}</option>`).join('')}</select>
-  <input id="fQ" placeholder="ค้นหา เลขอ้างอิง ชื่อ นามสกุล เบอร์โทร" value="${esc(f.q)}" aria-label="ค้นหา">`;
+const canEdit = (c) => S.isAdmin || c.is_mine;   // ฐานข้อมูลบังคับสิทธิ์ซ้ำอีกชั้น
+// ผู้ดูแลเลือกได้ทุกอู่ · บัญชีอู่เลือกได้แค่ทุกเรื่องหรือเรื่องของอู่ตัวเอง
+const garageOptions = (f) => S.isAdmin
+  ? `<option value="">ทุกอู่</option>${S.garages.map((g) => `<option value="${g.id}" ${f.garage === g.id ? 'selected' : ''}>${esc(g.name)}${g.code ? ` ( ${esc(g.code)} )` : ''}</option>`).join('')}`
+  : `<option value="">ทุกเรื่อง</option><option value="mine" ${f.garage === 'mine' ? 'selected' : ''}>เฉพาะอู่ของฉัน</option>`;
+const filterControls = (f) => `<select id="fGarage" aria-label="อู่">${garageOptions(f)}</select>
+  <input id="fQ" placeholder="ค้นหา ชื่อ นามสกุล เลขบัตร วันที่ เลขอ้างอิง เบอร์โทร" value="${esc(f.q)}" aria-label="ค้นหา">`;
 const readControls = (f) => { f.garage = $('fGarage').value; f.q = $('fQ').value.trim().toLowerCase(); };
 function complaintTable(list, total) {
-  return `<p class="muted">${total} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
-    ${list.map((c) => { const n = c.complaint_attachments?.length || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td><td>${esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ') || c.driver_name || '-')}</td><td>${esc(c.contact_phone || c.driver_phone || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${canEdit(c) ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="8" class="muted">ไม่พบเรื่อง</td></tr>'}
+  return `<p class="muted">${total} เรื่อง</p><div class="scroll"><table class="click"><thead><tr><th>วันที่ (วันรีพอร์ต)</th><th>เลขอ้างอิง</th>${S.isAdmin ? '<th>อู่</th>' : ''}<th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>วันเกิดเหตุ</th><th>รายละเอียด</th><th>เอกสารแนบ</th><th class="stick">จัดการ</th></tr></thead><tbody>
+    ${list.map((c) => { const n = Number(c.attachment_count) || 0; return `<tr data-open="${c.id}" tabindex="0"><td>${fmt(c.created_at)}</td><td>${esc(c.ref_no)}</td>${S.isAdmin ? `<td>${esc(gName(c.garage_id))}</td>` : ''}<td>${esc(c.driver_name || [c.reporter_name, c.reporter_last_name].filter(Boolean).join(' ') || '-')}</td><td>${esc(c.driver_phone || c.contact_phone || '-')}</td><td>${fmtDate(c.incident_date)}</td><td class="clip" title="${esc(c.detail)}">${esc(c.detail)}</td><td>${n ? n + ' ไฟล์' : '-'}</td><td class="stick"><div class="icons"><button type="button" class="ico view" data-open="${c.id}" title="ดูรายละเอียด" aria-label="ดูรายละเอียด">${ICON.view}</button>${canEdit(c) ? `<button type="button" class="ico edit" data-cedit="${c.id}" title="แก้ไข" aria-label="แก้ไข">${ICON.edit}</button>` : ''}${canEdit(c) ? `<button type="button" class="ico del" data-cdel="${c.id}" title="ลบ" aria-label="ลบ">${ICON.del}</button>` : ''}</div></td></tr>`; }).join('') || '<tr><td colspan="${S.isAdmin ? 9 : 8}" class="muted">ไม่พบเรื่อง</td></tr>'}
   </tbody></table></div>`;
 }
 
 // ── กราฟ: สีเดียว แท่งบาง เส้นตารางจาง · ไม่ใช้ style ในบรรทัดเพราะ CSP ปิดไว้ ──
-// สีประจำอู่ตามลำดับที่สร้าง สีจึงไม่เปลี่ยนเมื่อกรองหรือเรียงใหม่ · เกิน 8 อู่ใช้สีเทา
-const GARAGE_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
-const OTHER_COLOR = '#8a8986';
-function garageColor(id) {
-  const i = [...S.garages].sort((a, b) => a.created_at.localeCompare(b.created_at)).findIndex((g) => g.id === id);
-  return GARAGE_COLORS[i] || OTHER_COLOR;
-}
+const CHART_COLOR = '#2a78d6';
 const niceMax = (v) => { if (v <= 4) return Math.max(v, 1); const p = 10 ** Math.floor(Math.log10(v)), n = v / p; return (n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
 function monthChart(el, rows, from, to) {
   const W = Math.max(el.clientWidth, 280), H = 220, L = 30, R = 8, T = 22, B = 26;
   const max = niceMax(Math.max(...rows.map((r) => r.n))), y = (v) => T + (H - T - B) * (1 - v / max);
-  const step = (W - L - R) / rows.length, bw = Math.min(26, step - 4), every = W < 480 ? 2 : 1, top = Math.max(...rows.map((r) => r.n));
+  const step = (W - L - R) / rows.length, bw = Math.min(26, step - 4), every = W < 480 ? 2 : 1;
   const ticks = max <= 4 ? Array.from({ length: max + 1 }, (_, i) => i) : [0, max / 2, max];
   const bars = rows.map((r, i) => {
-    const x = L + step * i + (step - bw) / 2, yy = y(r.n), h = H - B - yy, on = r.ym >= from.slice(0, 7) && r.ym <= to.slice(0, 7), last = i === rows.length - 1;
-    // ซ้อนแท่งตามอู่ เว้น 2px ระหว่างอู่ · มุมโค้งเฉพาะบนสุด · เดือนนอกช่วงที่เลือกจางลง
-    let cur = H - B; const unit = r.n ? h / r.n : 0;
-    const bar = (r.seg || []).map((g, si, arr) => {
-      const sh = g.n * unit, top2 = cur - sh, topMost = si === arr.length - 1, gap = topMost ? 0 : 2, ht = Math.max(1, sh - gap), yTop = top2 + gap, rad = topMost ? Math.min(4, ht, bw / 2) : 0;
-      cur = top2;
-      return `<path fill="${garageColor(g.id)}" ${on ? '' : 'opacity="0.35"'} d="M${x} ${yTop + ht}V${yTop + rad}Q${x} ${yTop} ${x + rad} ${yTop}H${x + bw - rad}Q${x + bw} ${yTop} ${x + bw} ${yTop + rad}V${yTop + ht}Z"/>`;
-    }).join('');
-    const val = r.n && (r.n === top || last) ? `<text class="val" x="${x + bw / 2}" y="${yy - 6}" text-anchor="middle">${r.n}</text>` : '';
+    const x = L + step * i + (step - bw) / 2, yy = y(r.n), h = H - B - yy, on = r.ym >= from.slice(0, 7) && r.ym <= to.slice(0, 7);
+    // มุมโค้งเฉพาะบนสุด · เดือนนอกช่วงที่เลือกจางลง
+    const rad = Math.min(4, h, bw / 2);
+    const bar = r.n ? `<path fill="${CHART_COLOR}" ${on ? '' : 'opacity="0.35"'} d="M${x} ${yy + h}V${yy + rad}Q${x} ${yy} ${x + rad} ${yy}H${x + bw - rad}Q${x + bw} ${yy} ${x + bw} ${yy + rad}V${yy + h}Z"/>` : '';
+    const val = r.n ? `<text class="val" x="${x + bw / 2}" y="${yy - 6}" text-anchor="middle">${r.n}</text>` : '';
     const lab = (rows.length - 1 - i) % every === 0 ? `<text class="axis" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${monthLabel(r.ym)}</text>` : '';
-    return `<g><rect class="hit" x="${L + step * i}" y="${T}" width="${step}" height="${H - T}" data-tip="${esc(monthLabel(r.ym, true))}: ${r.n} เรื่อง${(r.seg || []).length ? ' (' + r.seg.map((g) => gName(g.id) + ' ' + g.n).join(', ') + ')' : ''}"/>${bar}${val}${lab}</g>`;
+    return `<g><rect class="hit" x="${L + step * i}" y="${T}" width="${step}" height="${H - T}" data-tip="${esc(monthLabel(r.ym, true))}: ${r.n} เคส"/>${bar}${val}${lab}</g>`;
   }).join('');
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="จำนวนเรื่องรายเดือน 12 เดือนล่าสุด">
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="จำนวนเคสรายเดือน 12 เดือนล่าสุด">
     ${ticks.map((t) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`).join('')}${bars}</svg>`;
+}
+// นับคนจากเลขบัตร ไม่เดาจากชื่อ คนชื่อเหมือนกันจึงไม่ถูกรวม · เรื่องเก่าที่ไม่มีเลขบัตรรวมตามชื่อ
+function driverRank(list) {
+  const by = new Map();
+  for (const c of list) {
+    const name = (c.driver_name || '').trim();
+    const key = c.person_nid_key || (name ? 'name:' + name.toLowerCase() : 'none');
+    const r = by.get(key) || { n: 0, name: '', last4: '' };
+    r.n++; r.name = r.name || name; r.last4 = r.last4 || c.national_id_last4 || '';   // เรียงล่าสุดก่อน จึงได้ชื่อล่าสุดที่กรอก
+    by.set(key, r);
+  }
+  return [...by.values()]
+    .map((r) => ({ n: r.n, label: (r.name || 'ไม่ระบุชื่อ') + (r.last4 ? ` (บัตรลงท้าย ${r.last4})` : '') }))
+    .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, 'th'));
 }
 const hBars = (rows) => {
   const max = Math.max(1, ...rows.map((r) => r.n));
-  return rows.length ? `<div class="hbars">${rows.map((r) => `<div class="hbar" data-tip="${esc(r.label)}: ${r.n} เรื่อง"><span class="hlabel" title="${esc(r.label)}"><i class="swatch"><svg width="10" height="10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="${r.color}"/></svg></i>${esc(r.label)}</span><svg width="100%" height="14" aria-hidden="true">${r.n ? `<rect fill="${r.color}" width="${(r.n / max) * 100}%" height="14" rx="4"/>` : ''}</svg><b>${r.n}</b></div>`).join('')}</div>` : '<p class="muted">ไม่มีข้อมูล</p>';
+  return rows.length ? `<div class="hbars">${rows.map((r) => `<div class="hbar" data-tip="${esc(r.label)}: ${r.n} เคส"><span class="hlabel" title="${esc(r.label)}">${esc(r.label)}</span><svg width="100%" height="14" aria-hidden="true">${r.n ? `<rect fill="${CHART_COLOR}" width="${(r.n / max) * 100}%" height="14" rx="4"/>` : ''}</svg><b>${r.n}</b></div>`).join('')}</div>` : '<p class="muted">ไม่มีข้อมูล</p>';
 };
 
 // ── โหลดข้อมูล ──
-async function fetchAll(table, select, order) {
-  let out = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from(table).select(select).order(order, { ascending: false }).range(from, from + 999);
-    if (error) throw error;
-    out = out.concat(data);
-    if (data.length < 1000) return out;
-  }
-}
 async function loadGarages() {
   const { data, error } = await sb.from('garages').select('*').order('sort_order').order('name');
   if (error) throw error;
   S.garages = data;
 }
-const loadComplaints = async () => { S.complaints = await fetchAll('complaints', '*,complaint_attachments(id)', 'created_at'); };
+const loadComplaints = async () => {
+  let out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.rpc('list_complaints').order('created_at', { ascending: false }).order('id').range(from, from + 999);
+    if (error) throw error;
+    out = out.concat(data);
+    if (data.length < 1000) break;
+  }
+  S.complaints = out;
+};
 async function loadUsers() {
   const { data, error } = await sb.rpc('admin_list_users');
   if (error) throw error;
@@ -186,8 +214,8 @@ const VIEWS = {
       </div>
       <p class="muted" id="dPeriod"></p>
       <div class="charts">
-        <section class="panel wide"><h3>จำนวนเรื่องตามเดือน <span class="muted">12 เดือนล่าสุด</span></h3><div id="cLegend" class="legend"></div><div id="cMonth"></div></section>
-        <section class="panel wide"><h3>ตามอู่ <span class="muted">ในช่วงที่เลือก</span></h3><div id="cGarage"></div></section>
+        <section class="panel wide"><h3>จำนวนเคสตามเดือน <span class="muted">12 เดือนล่าสุด</span></h3><div id="cMonth"></div></section>
+        <section class="panel wide"><h3>พนักงานที่ถูกร้องเรียนมากที่สุด <span class="muted">ในช่วงที่เลือก</span></h3><div id="cDriver"></div></section>
       </div>`;
     const redraw = () => {
       readControls(f);
@@ -199,13 +227,10 @@ const VIEWS = {
       $('dPeriod').textContent = f.from || f.to ? `ช่วงที่แสดง: ${fmtDate(f.from)} ถึง ${fmtDate(f.to)}` : 'ช่วงที่แสดง: ทั้งหมด';
       const ym = bkk().slice(0, 7);
       const months = Array.from({ length: 12 }, (_, i) => addMonths(ym, i - 11)).map((m) => {
-        const rows = base.filter((c) => bkk(c.created_at).slice(0, 7) === m);
-        return { ym: m, n: rows.length, seg: S.garages.map((g) => ({ id: g.id, n: rows.filter((c) => c.garage_id === g.id).length })).filter((g) => g.n) };
+        return { ym: m, n: base.filter((c) => bkk(c.created_at).slice(0, 7) === m).length };
       });
-      const shownG = S.garages.filter((g) => months.some((r) => r.seg.some((x) => x.id === g.id)));
-      $('cLegend').innerHTML = shownG.map((g) => `<span class="lg"><i class="swatch"><svg width="10" height="10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="${garageColor(g.id)}"/></svg></i>${esc(g.name)}</span>`).join('');
       monthChart($('cMonth'), months, f.from || '0000-00', f.to || '9999-99');
-      $('cGarage').innerHTML = hBars(S.garages.map((g) => ({ label: g.name, color: garageColor(g.id), n: list.filter((c) => c.garage_id === g.id).length })).filter((r) => r.n || !f.garage).sort((a, b) => b.n - a.n));
+      $('cDriver').innerHTML = hBars(driverRank(list));
     };
     S.redraw = redraw;
     $('dStats').onclick = (e) => {
@@ -214,7 +239,7 @@ const VIEWS = {
     };
     const custom = () => { f.preset = 'custom'; f.from = $('fFrom').value; f.to = $('fTo').value; redraw(); };
     $('fFrom').onchange = custom; $('fTo').onchange = custom;
-    $('fGarage').onchange = redraw; $('fQ').oninput = redraw;
+    $('fGarage').onchange = redraw; bindSearch(redraw);
     redraw();
   },
 
@@ -239,7 +264,7 @@ const VIEWS = {
     };
     S.redraw = redraw;
     const refilter = () => { f.page = 1; redraw(); };
-    ['fGarage', 'fFrom', 'fTo', 'fSort'].forEach((id) => { $(id).onchange = refilter; }); $('fQ').oninput = refilter;
+    ['fGarage', 'fFrom', 'fTo', 'fSort'].forEach((id) => { $(id).onchange = refilter; }); bindSearch(refilter);
     $('cList').onclick = (e) => { const p = e.target.closest('[data-page]')?.dataset.page; if (p) { f.page = +p; redraw(); $('view').scrollIntoView(); } };
     redraw();
   },
@@ -289,6 +314,7 @@ function auditDetail(a) {
   const d = a.detail || {};
   if (a.action === 'move_complaint') return `${gName(d.from)} → ${gName(d.to)} (${d.reason || ''})`;
   if (a.action === 'set_status') return `${STATUS[d.from] || d.from} → ${STATUS[d.to] || d.to}`;
+  if (a.action === 'submit_complaint') return `อู่ ${gName(d.garage_id)}`;
   if (a.action === 'create_user') return d.username || '';
   if (d.user_id) return S.users.find((u) => u.user_id === d.user_id)?.username || '';
   return '';
@@ -304,11 +330,11 @@ async function openComplaint(id) {
     return data ? `<li><a href="${esc(data.signedUrl)}" target="_blank" rel="noopener">${esc(f.file_name)}</a></li>` : `<li>${esc(f.file_name)} (เปิดไม่ได้)</li>`;
   }));
   const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-  const mine = S.isAdmin || c.garage_id === S.me.garage_id;   // เรื่องของอู่อื่น = ดูอย่างเดียว (ฐานข้อมูลก็บังคับเช่นกัน)
+  const mine = S.isAdmin || c.is_mine;   // เรื่องของอู่อื่น = ดูอย่างเดียว (ฐานข้อมูลก็บังคับเช่นกัน)
   $('dlgBody').innerHTML = `<h2>เรื่อง ${esc(c.ref_no)}</h2>
     <dl class="detail">
-      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${row('อู่', esc(gName(c.garage_id)))}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
-      ${c.reporter_name ? row('ผู้แจ้ง', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))) : ''}${c.contact_phone ? row('เบอร์โทรผู้แจ้ง', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`) : ''}
+      ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${S.isAdmin ? row('อู่', esc(gName(c.garage_id))) : ''}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
+      ${c.reporter_name ? row('ผู้ร้องเรียน', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))) : ''}${c.contact_phone ? row('เบอร์โทรผู้ร้องเรียน', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`) : ''}
       ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
       ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">กำลังโหลด…</span>` : '-')}
     </dl>
