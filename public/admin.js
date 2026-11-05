@@ -57,8 +57,10 @@ function bindSearch(redraw) {
   $('fQ').oninput = async () => {
     const digits = /^[\d\s-]+$/.test($('fQ').value) ? $('fQ').value.replace(/\D/g, '') : '';
     if (digits.length === 13 && nidHit.q !== digits) {
-      const { data } = await sb.rpc('find_complaints_by_nid', { p_nid: digits });
-      nidHit.q = digits; nidHit.ids = new Set(data || []);
+      const { data, error } = await sb.rpc('find_complaints_by_nid', { p_nid: digits });
+      if (error) return toast(errMsg(error));
+      // ฐานข้อมูลส่งกลับได้ทั้งเป็นค่าเดี่ยวและเป็นแถว
+      nidHit.q = digits; nidHit.ids = new Set((data || []).map((x) => (typeof x === 'string' ? x : Object.values(x)[0])));
     }
     redraw();
   };
@@ -334,11 +336,11 @@ async function openComplaint(id) {
   $('dlgBody').innerHTML = `<h2>เรื่อง ${esc(c.ref_no)}</h2>
     <dl class="detail">
       ${row('วันที่แจ้ง', fmt(c.created_at))}${row('วันเกิดเหตุ', fmtDate(c.incident_date))}${S.isAdmin ? row('อู่', esc(gName(c.garage_id))) : ''}${c.plate ? row('ทะเบียน', esc(c.plate)) : ''}
-      ${c.reporter_name ? row('ผู้ร้องเรียน', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))) : ''}${c.contact_phone ? row('เบอร์โทรผู้ร้องเรียน', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`) : ''}
       ${row('ชื่อคนขับ', esc(c.driver_name || '-'))}${row('มือถือคนขับ', c.driver_phone ? `<a href="tel:${esc(c.driver_phone)}">${esc(c.driver_phone)}</a>` : '-')}${row('Line ID', esc(c.driver_line_id || '-'))}
       ${row('เลขบัตร', c.national_id_last4 ? `<span id="nidVal">กำลังโหลด…</span>` : '-')}
     </dl>
     <h3>รายละเอียด</h3><p class="prewrap">${esc(c.detail)}</p>
+    ${c.reporter_name || c.contact_phone ? `<dl class="detail">${c.reporter_name ? row('ผู้ร้องเรียน', esc([c.reporter_name, c.reporter_last_name].filter(Boolean).join(' '))) : ''}${c.contact_phone ? row('เบอร์โทรผู้ร้องเรียน', `<a href="tel:${esc(c.contact_phone)}">${esc(c.contact_phone)}</a>`) : ''}</dl>` : ''}
     <h3>ไฟล์แนบ</h3>${links.length ? `<ul>${links.join('')}</ul>` : '<p class="muted">ไม่มีไฟล์แนบ</p>'}
     <p>สถานะ <span class="tag ${c.status}">${STATUS[c.status]}</span>${mine ? '' : ' <span class="muted">เรื่องของอู่อื่น ดูได้อย่างเดียว</span>'}</p>
     <h3>หมายเหตุของอู่</h3>

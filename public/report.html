@@ -25,9 +25,6 @@
     <label>อู่แท็กซี่ <b>*</b>
       <select id="garage" required><option value="">กำลังโหลด…</option></select>
     </label>
-    <h2>ผู้ร้องเรียน <small>(ไม่บังคับ)</small></h2>
-    <label>ชื่อผู้ร้องเรียน <input id="reporterName" maxlength="100" autocomplete="off"></label>
-    <label>เบอร์โทรผู้ร้องเรียน <input id="reporterPhone" inputmode="tel" maxlength="15" autocomplete="off" placeholder="08x-xxx-xxxx"></label>
     <label>วันเกิดเหตุ <b>*</b>
       <input id="incidentDate" type="date" required>
     </label>
@@ -43,6 +40,9 @@
     <label>รายละเอียด <b>*</b>
       <textarea id="detail" required rows="5" maxlength="2000" placeholder="เกิดอะไรขึ้น เมื่อไร ที่ไหน"></textarea>
     </label>
+    <h2>ผู้ร้องเรียน <small>(ไม่บังคับ)</small></h2>
+    <label>ชื่อผู้ร้องเรียน <input id="reporterName" maxlength="100" autocomplete="off"></label>
+    <label>เบอร์โทรผู้ร้องเรียน <input id="reporterPhone" inputmode="tel" maxlength="15" autocomplete="off" placeholder="08x-xxx-xxxx"></label>
     <label>รูปหรือไฟล์แนบ <small>(เลือกเพิ่มได้หลายครั้ง ไม่เกิน 5 ไฟล์ · รูป หรือ PDF ไม่เกิน 10 MB)</small>
       <input id="files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf">
     </label>
